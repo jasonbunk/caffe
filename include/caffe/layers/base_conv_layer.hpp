@@ -165,7 +165,8 @@ class BaseConvolutionLayer : public Layer<Dtype> {
   int col_offset_;
   int output_offset_;
 
-  Blob<Dtype> col_buffer_;
+  // PR2016: N.B. sharing the col buffer reduces memory but interferes with ND conv and parallelism
+  static Blob<Dtype> col_buffer_;
   Blob<Dtype> bias_multiplier_;
 };
 

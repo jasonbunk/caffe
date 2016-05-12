@@ -8,6 +8,10 @@
 
 namespace caffe {
 
+// PR2016
+template <typename Dtype>
+Blob<Dtype> BaseConvolutionLayer<Dtype>::col_buffer_;
+
 template <typename Dtype>
 void BaseConvolutionLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
