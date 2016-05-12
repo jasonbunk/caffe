@@ -89,6 +89,14 @@ void CheckContiguousArray(PyArrayObject* arr, string name,
 // Net constructor for passing phase as int
 shared_ptr<Net<Dtype> > Net_Init(
     string param_file, int phase) {
+
+#ifndef CPU_ONLY
+  set_mode_gpu(); //hack needed because of problems with this function when trying to use CRF-RNN from python
+#endif
+//keywords:
+//You initialize your network on CPU, please initialize it on GPU.
+//issues with python issues with gpu mode problems problems with gpu mode setting gpu when cpu here python initialization initialized network gpu cpu GPU CPU mode before after
+
   CheckFile(param_file);
 
   shared_ptr<Net<Dtype> > net(new Net<Dtype>(param_file,
@@ -99,6 +107,11 @@ shared_ptr<Net<Dtype> > Net_Init(
 // Net construct-and-load convenience constructor
 shared_ptr<Net<Dtype> > Net_Init_Load(
     string param_file, string pretrained_param_file, int phase) {
+
+#ifndef CPU_ONLY
+  set_mode_gpu(); //hack needed because of problems with this function when trying to use CRF-RNN from python
+#endif
+
   CheckFile(param_file);
   CheckFile(pretrained_param_file);
 
