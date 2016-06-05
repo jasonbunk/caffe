@@ -1,5 +1,7 @@
 #ifdef USE_OPENCV
 #include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+//#include <opencv2/highgui/highgui.hpp>
 #endif  // USE_OPENCV
 
 #include <string>
@@ -35,6 +37,11 @@ DataTransformer<Dtype>::DataTransformer(const TransformationParameter& param,
     for (int c = 0; c < param_.mean_value_size(); ++c) {
       mean_values_.push_back(param_.mean_value(c));
     }
+  }
+  if(param_.has_affine_goal_size_x()) {CHECK(param_.has_affine_goal_size_y());}
+  if(param_.has_affine_goal_size_y()) {CHECK(param_.has_affine_goal_size_x());}
+  if(param_.has_affine_goal_size_x() || param_.has_affine_goal_size_y()) {
+    LOG(INFO)<<"Will do affine transformations on images as they are loaded.";
   }
 }
 
@@ -77,7 +84,12 @@ void DataTransformer<Dtype>::Transform(const Datum& datum,
 
   int height = datum_height;
   int width = datum_width;
-
+  
+  if(param_.has_affine_goal_size_x() || param_.has_affine_goal_size_y()) {
+    LOG(INFO)<<"Warning: not using affine transformations, "<<
+                "since database did not contain OpenCV-encoded images.";
+  }
+  
   int h_off = 0;
   int w_off = 0;
   if (crop_size) {
@@ -222,13 +234,17 @@ void DataTransformer<Dtype>::Transform(const vector<cv::Mat> & mat_vector,
   }
 }
 
+static const float DEG2RADs = 0.01745329252f;
+
 template<typename Dtype>
 void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
                                        Blob<Dtype>* transformed_blob) {
   const int crop_size = param_.crop_size();
   const int img_channels = cv_img.channels();
-  const int img_height = cv_img.rows;
-  const int img_width = cv_img.cols;
+  const int img_height = param_.has_affine_goal_size_y() ?
+                                    param_.affine_goal_size_y() : cv_img.rows;
+  const int img_width  = param_.has_affine_goal_size_x() ?
+                                    param_.affine_goal_size_x() : cv_img.cols;
 
   // Check dimensions.
   const int channels = transformed_blob->channels();
@@ -269,15 +285,62 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
       }
     }
   }
+  
+  cv::Mat affresult;
+  if(param_.has_affine_goal_size_x() && param_.has_affine_goal_size_y()) {
+    float basescaleX= ((float)param_.affine_goal_size_x()) / ((float)cv_img.cols);
+    float basescaleY= ((float)param_.affine_goal_size_y()) / ((float)cv_img.rows);
+    float centerX = ((float)cv_img.cols) / 2.0f;
+    float centerY = ((float)cv_img.rows) / 2.0f;
+    float randscale=RandFloat(1.0f-param_.affine_noise_scale(), 1.0f+param_.affine_noise_scale());
+    float angleoff =RandFloat(-param_.affine_noise_angle()*DEG2RADs, param_.affine_noise_angle()*DEG2RADs);
+    float shearX   =RandFloat(-param_.affine_noise_shear(), param_.affine_noise_shear());
+    float shearY   =RandFloat(-param_.affine_noise_shear(), param_.affine_noise_shear());
+    float rtranslX =RandFloat(-param_.affine_noise_translate(), param_.affine_noise_translate());
+    float rtranslY =RandFloat(-param_.affine_noise_translate(), param_.affine_noise_translate());
+    
+    cv::Mat aff_translate_start = cv::Mat::eye(3, 3, CV_32F);
+    aff_translate_start.at<float>(0,2) = -centerX;
+    aff_translate_start.at<float>(1,2) = -centerY;
+    
+    cv::Mat aff_rotatescale = cv::Mat::eye(3, 3, CV_32F);
+    aff_rotatescale.at<float>(0,0) =  cos(angleoff) * randscale * basescaleX;
+    aff_rotatescale.at<float>(0,1) =  sin(angleoff) * randscale * basescaleY;
+    aff_rotatescale.at<float>(1,0) = -sin(angleoff) * randscale * basescaleX;
+    aff_rotatescale.at<float>(1,1) =  cos(angleoff) * randscale * basescaleY;
+    
+    cv::Mat aff_shear = cv::Mat::eye(3, 3, CV_32F);
+    aff_shear.at<float>(0,1) = shearX;
+    aff_shear.at<float>(1,0) = shearY;
+    
+    cv::Mat aff_translate_end = cv::Mat::eye(3, 3, CV_32F);
+    aff_translate_end.at<float>(0,2) = centerX * basescaleX + rtranslX;
+    aff_translate_end.at<float>(1,2) = centerY * basescaleY + rtranslY;
+    
+    cv::Size dsize(param_.affine_goal_size_x(), param_.affine_goal_size_y());
+    affresult = cv::Mat(dsize, cv_img.type());
+    
+    cv::warpAffine(cv_img, affresult,
+      (aff_translate_end * aff_shear * aff_rotatescale * aff_translate_start)(cv::Rect(0, 0, 3, 2)),
+      dsize,
+      cv::INTER_LINEAR,
+      cv::BORDER_REFLECT_101); //cv::BORDER_CONSTANT);
+    
+    //cv::imshow("cv_img",cv_img);
+    //cv::imshow("affresult",affresult);
+    //cv::waitKey(0);
+  } else {
+    affresult = cv_img;
+  }
 
   int h_off = 0;
   int w_off = 0;
-  cv::Mat cv_cropped_img = cv_img;
+  cv::Mat cv_cropped_img = affresult;
   if (crop_size) {
     CHECK_EQ(crop_size, height);
     CHECK_EQ(crop_size, width);
-    // We only do random crop when we do training.
-    if (phase_ == TRAIN) {
+    // We only do random crop when we do training, or if we want affine transformations
+    if (phase_ == TRAIN || param_.has_affine_goal_size_x()) {
       h_off = Rand(img_height - crop_size + 1);
       w_off = Rand(img_width - crop_size + 1);
     } else {
@@ -285,7 +348,7 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
       w_off = (img_width - crop_size) / 2;
     }
     cv::Rect roi(w_off, h_off, crop_size, crop_size);
-    cv_cropped_img = cv_img(roi);
+    cv_cropped_img = affresult(roi);
   } else {
     CHECK_EQ(img_height, height);
     CHECK_EQ(img_width, width);
@@ -355,7 +418,11 @@ void DataTransformer<Dtype>::Transform(Blob<Dtype>* input_blob,
   CHECK_EQ(input_channels, channels);
   CHECK_GE(input_height, height);
   CHECK_GE(input_width, width);
-
+  
+  if(param_.has_affine_goal_size_x() || param_.has_affine_goal_size_y()) {
+    LOG(INFO)<<"Warning: not using affine transformations, "<<
+                "since database did not contain OpenCV-encoded images.";
+  }
 
   const Dtype scale = param_.scale();
   const bool do_mirror = param_.mirror() && Rand(2);
@@ -522,7 +589,8 @@ vector<int> DataTransformer<Dtype>::InferBlobShape(
 template <typename Dtype>
 void DataTransformer<Dtype>::InitRand() {
   const bool needs_rand = param_.mirror() ||
-      (phase_ == TRAIN && param_.crop_size());
+      (phase_ == TRAIN && param_.crop_size())
+     || param_.has_affine_goal_size_x();
   if (needs_rand) {
     const unsigned int rng_seed = caffe_rng_rand();
     rng_.reset(new Caffe::RNG(rng_seed));
@@ -538,6 +606,15 @@ int DataTransformer<Dtype>::Rand(int n) {
   caffe::rng_t* rng =
       static_cast<caffe::rng_t*>(rng_->generator());
   return ((*rng)() % n);
+}
+
+template <typename Dtype>
+float DataTransformer<Dtype>::RandFloat(float min, float max) {
+  CHECK(rng_);
+  caffe::rng_t* rng =
+      static_cast<caffe::rng_t*>(rng_->generator());
+  float uniform01 = ((float)((*rng)())) / 4294967295.0f; // rng_t uses uint32
+  return min + (uniform01*(max-min));
 }
 
 INSTANTIATE_CLASS(DataTransformer);

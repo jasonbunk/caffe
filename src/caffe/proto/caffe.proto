@@ -427,6 +427,20 @@ message TransformationParameter {
   optional bool force_color = 6 [default = false];
   // Force the decoded image to have 1 color channels.
   optional bool force_gray = 7 [default = false];
+  // NOTE: These require the images to be encoded using OpenCV when creating the
+  //       database file. The images should be encoded at a larger size, as they
+  //       will be resized to "goal_size" as part of the transformation.
+  // NOTE: "affine_goal_size_" x and y MUST be set for these to be used.
+  // Images are scaled to "goal_size_" FIRST
+  optional float affine_goal_size_x = 8 [default = 0];
+  optional float affine_goal_size_y = 9 [default = 0];
+  // scale by 1 +/- "affine_noise_scale"
+  optional float affine_noise_scale = 10 [default = 0];
+  // rotate by +/- "affine_noise_angle" degrees
+  optional float affine_noise_angle = 11 [default = 0];
+  optional float affine_noise_shear = 12 [default = 0];
+  // in pixel units of "goal_size"
+  optional float affine_noise_translate = 13 [default = 0];
 }
 
 // Message that stores parameters shared by loss layers
