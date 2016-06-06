@@ -441,6 +441,11 @@ message TransformationParameter {
   optional float affine_noise_shear = 12 [default = 0];
   // in pixel units of "goal_size"
   optional float affine_noise_translate = 13 [default = 0];
+  // if using affine transformations with 4-channel images,
+  // where the 4th channel is the semantic segmentation label mask,
+  // these will help speed up the mask transformations
+  optional int32 num_classes = 14 [default = 255];
+  optional int32 ignore_label = 15;
 }
 
 // Message that stores parameters shared by loss layers

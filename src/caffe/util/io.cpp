@@ -71,11 +71,11 @@ void WriteProtoToBinaryFile(const Message& proto, const char* filename) {
 
 #ifdef USE_OPENCV
 cv::Mat ReadImageToCVMat(const string& filename,
-    const int height, const int width, const bool is_color) {
+    const int height, const int width, const int is_color) {
   cv::Mat cv_img;
-  int cv_read_flag = (is_color ? CV_LOAD_IMAGE_COLOR :
-    CV_LOAD_IMAGE_GRAYSCALE);
-  cv::Mat cv_img_origin = cv::imread(filename, cv_read_flag);
+  assert(CV_LOAD_IMAGE_GRAYSCALE == 0);
+  assert(CV_LOAD_IMAGE_COLOR == 1);
+  cv::Mat cv_img_origin = cv::imread(filename, is_color);
   if (!cv_img_origin.data) {
     LOG(ERROR) << "Could not open or find file " << filename;
     return cv_img_origin;
@@ -94,7 +94,7 @@ cv::Mat ReadImageToCVMat(const string& filename,
 }
 
 cv::Mat ReadImageToCVMat(const string& filename,
-    const bool is_color) {
+    const int is_color) {
   return ReadImageToCVMat(filename, 0, 0, is_color);
 }
 
@@ -109,7 +109,7 @@ static bool matchExt(const std::string & fn,
   std::string ext = p != fn.npos ? fn.substr(p) : fn;
   std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
   std::transform(en.begin(), en.end(), en.begin(), ::tolower);
-  if ( ext == en )
+  if ( ext == en || (ext == std::string(".")+en) )
     return true;
   if ( en == "jpg" && ext == "jpeg" )
     return true;
@@ -117,20 +117,28 @@ static bool matchExt(const std::string & fn,
 }
 
 bool ReadImageToDatum(const string& filename, const int label,
-    const int height, const int width, const bool is_color,
+    const int height, const int width, const int is_color,
     const std::string & encoding, Datum* datum) {
   cv::Mat cv_img = ReadImageToCVMat(filename, height, width, is_color);
   if (cv_img.data) {
     if (encoding.size()) {
-      if ( (cv_img.channels() == 3) == is_color && !height && !width &&
-          matchExt(filename, encoding) )
+      datum->set_encoded(true);
+      datum->set_label(label);
+      datum->set_channels(cv_img.channels());
+      datum->set_height(cv_img.rows);
+      datum->set_width(cv_img.cols);
+      bool colorasdesired = (cv_img.channels() == 3) == (is_color == 1)
+                         || (cv_img.channels() == 1) == (is_color == 0)
+                         || is_color < 0;
+      bool shapeasdesired =
+                        ((height != 0 && height == cv_img.rows) || height == 0)
+                     && (( width != 0 &&  width == cv_img.cols) ||  width == 0);
+      if ( colorasdesired && shapeasdesired && matchExt(filename, encoding) )
         return ReadFileToDatum(filename, label, datum);
       std::vector<uchar> buf;
       cv::imencode("."+encoding, cv_img, buf);
       datum->set_data(std::string(reinterpret_cast<char*>(&buf[0]),
                       buf.size()));
-      datum->set_label(label);
-      datum->set_encoded(true);
       return true;
     }
     CVMatToDatum(cv_img, datum);
@@ -174,14 +182,14 @@ cv::Mat DecodeDatumToCVMatNative(const Datum& datum) {
   }
   return cv_img;
 }
-cv::Mat DecodeDatumToCVMat(const Datum& datum, bool is_color) {
+cv::Mat DecodeDatumToCVMat(const Datum& datum, int is_color) {
   cv::Mat cv_img;
   CHECK(datum.encoded()) << "Datum not encoded";
   const string& data = datum.data();
   std::vector<char> vec_data(data.c_str(), data.c_str() + data.size());
-  int cv_read_flag = (is_color ? CV_LOAD_IMAGE_COLOR :
-    CV_LOAD_IMAGE_GRAYSCALE);
-  cv_img = cv::imdecode(vec_data, cv_read_flag);
+  assert(CV_LOAD_IMAGE_GRAYSCALE == 0);
+  assert(CV_LOAD_IMAGE_COLOR == 1);
+  cv_img = cv::imdecode(vec_data, is_color);
   if (!cv_img.data) {
     LOG(ERROR) << "Could not decode datum ";
   }
@@ -199,7 +207,7 @@ bool DecodeDatumNative(Datum* datum) {
     return false;
   }
 }
-bool DecodeDatum(Datum* datum, bool is_color) {
+bool DecodeDatum(Datum* datum, int is_color) {
   if (datum->encoded()) {
     cv::Mat cv_img = DecodeDatumToCVMat((*datum), is_color);
     CVMatToDatum(cv_img, datum);

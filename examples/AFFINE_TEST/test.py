@@ -9,6 +9,8 @@ import cv2
 
 if not os.path.isdir(caffe_root+'examples/images/CatLMDB'):
 	import subprocess
+	with open(caffe_root+'examples/images/cat.txt','w') as listfile:
+		listfile.write('cat.jpg 0')
 	subprocess.check_output([caffe_root+'build/tools/convert_imageset',
 			'--encoded=1',
 			'--encode_type=png',
@@ -17,7 +19,7 @@ if not os.path.isdir(caffe_root+'examples/images/CatLMDB'):
 			caffe_root+'examples/images/CatLMDB'])
 
 caffe.set_mode_cpu()
-nnet = caffe.Net(caffe_root+'examples/AFFINE_TEST/test.prototxt', caffe.TRAIN)
+nnet = caffe.Net(caffe_root+'examples/AFFINE_TEST/Test.prototxt', caffe.TRAIN)
 
 def displayable(caffeimage):
 	return np.transpose(caffeimage[0,:,:,:],(1,2,0)) / 255.0

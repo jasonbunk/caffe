@@ -253,8 +253,6 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
   const int num = transformed_blob->num();
 
   CHECK_EQ(channels, img_channels);
-  CHECK_LE(height, img_height);
-  CHECK_LE(width, img_width);
   CHECK_GE(num, 1);
 
   CHECK(cv_img.depth() == CV_8U) << "Image data type must be unsigned byte";
@@ -265,8 +263,6 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
   const bool has_mean_values = mean_values_.size() > 0;
 
   CHECK_GT(img_channels, 0);
-  CHECK_GE(img_height, crop_size);
-  CHECK_GE(img_width, crop_size);
 
   Dtype* mean = NULL;
   if (has_mean_file) {
@@ -319,17 +315,100 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
     
     cv::Size dsize(param_.affine_goal_size_x(), param_.affine_goal_size_y());
     affresult = cv::Mat(dsize, cv_img.type());
+    cv::Mat warpmat = (aff_translate_end * aff_shear * aff_rotatescale * aff_translate_start)(cv::Rect(0, 0, 3, 2));
     
-    cv::warpAffine(cv_img, affresult,
-      (aff_translate_end * aff_shear * aff_rotatescale * aff_translate_start)(cv::Rect(0, 0, 3, 2)),
-      dsize,
-      cv::INTER_LINEAR,
-      cv::BORDER_REFLECT_101); //cv::BORDER_CONSTANT);
+    if(img_channels == 4) {
+      cv::Mat rgb( cv_img.rows, cv_img.cols, CV_8UC3 );
+      cv::Mat alpha( cv_img.rows, cv_img.cols, CV_8UC1 );
+      cv::Mat out[] = { rgb, alpha };
+      int from_to[] = { 0,0, 1,1, 2,2, 3,3 };
+      cv::mixChannels( &cv_img, 1, out, 2, from_to, 4 );
+      
+      rgb.create(dsize, CV_8UC3);
+      alpha = cv::Mat::zeros(dsize, CV_8U);
+      
+      cv::warpAffine(out[0], rgb,
+        warpmat,
+        dsize,
+        cv::INTER_LINEAR,
+        cv::BORDER_REFLECT_101);
+      
+      //cv::imshow("rgb", rgb);
+      
+      cv::Mat thismask;
+      cv::Mat tempout;
+      
+      // warp each label independently
+      CHECK_LE(param_.num_classes(), 255);
+      const int numclasses = param_.num_classes();
+      for(int cc=1; cc<=numclasses; cc++) {
+        const uint8_t thisclass = ((uint8_t)cc);
+        thismask = (out[1] == thisclass);
+        if(cv::countNonZero(thismask) > 0) {
+          //cv::imshow(format_int(thisclass), thismask);
+          tempout.create(dsize, CV_8U);
+          cv::warpAffine(thismask, tempout,
+            warpmat,
+            dsize,
+            cv::INTER_LINEAR,
+            cv::BORDER_REFLECT_101);
+          for(int ii=0; ii<alpha.rows; ii++) {
+            for(int jj=0; jj<alpha.cols; jj++) {
+              if(tempout.at<uint8_t>(ii,jj) > 127) {
+                alpha.at<uint8_t>(ii,jj) = thisclass;
+              }
+            }
+          }
+        }
+      }
+      // warp ignore mask, if needed
+      if(param_.has_ignore_label()) {
+        CHECK_LE(param_.ignore_label(), 255);
+        const uint8_t ignorelabel = (uint8_t)param_.ignore_label();
+        thismask = (out[1] == ignorelabel);
+        if(cv::countNonZero(thismask) > 0) {
+          tempout.create(dsize, CV_8U);
+          cv::warpAffine(thismask, tempout,
+            warpmat,
+            dsize,
+            cv::INTER_LINEAR,
+            cv::BORDER_REFLECT_101);
+          for(int ii=0; ii<alpha.rows; ii++) {
+            for(int jj=0; jj<alpha.cols; jj++) {
+              if(tempout.at<uint8_t>(ii,jj) > 127) {
+                alpha.at<uint8_t>(ii,jj) = ignorelabel;
+              }
+            }
+          }
+        }
+      }
+      
+      out[0] = rgb;
+      out[1] = alpha;
+      
+      //cv::imshow("alpha", alpha);
+      //cv::imshow("alpha*200", alpha*200);
+      
+      cv::mixChannels( out, 2, &affresult, 1, from_to, 4 );
+      
+      //cv::imshow("affresult", affresult);
+      //cv::waitKey(0);
     
+    } else {
+      cv::warpAffine(cv_img, affresult,
+        warpmat,
+        dsize,
+        cv::INTER_LINEAR,
+        cv::BORDER_REFLECT_101); //cv::BORDER_CONSTANT);
+    }
     //cv::imshow("cv_img",cv_img);
     //cv::imshow("affresult",affresult);
     //cv::waitKey(0);
   } else {
+    CHECK_LE(height, img_height);
+    CHECK_LE(width, img_width);
+    CHECK_GE(img_height, crop_size);
+    CHECK_GE(img_width, crop_size);
     affresult = cv_img;
   }
 
@@ -562,8 +641,13 @@ vector<int> DataTransformer<Dtype>::InferBlobShape(const cv::Mat& cv_img) {
   const int img_width = cv_img.cols;
   // Check dimensions.
   CHECK_GT(img_channels, 0);
-  CHECK_GE(img_height, crop_size);
-  CHECK_GE(img_width, crop_size);
+  if(param_.has_affine_goal_size_x() && param_.has_affine_goal_size_y()) {
+    CHECK_GE(param_.affine_goal_size_x(), crop_size);
+    CHECK_GE(param_.affine_goal_size_y(), crop_size);
+  } else {
+    CHECK_GE(img_height, crop_size);
+    CHECK_GE(img_width, crop_size);
+  }
   // Build BlobShape.
   vector<int> shape(4);
   shape[0] = 1;

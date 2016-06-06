@@ -85,6 +85,10 @@ def datum_to_array(datum):
     """Converts a datum to an array. Note that the label is not returned,
     as one can easily get it by calling datum.label.
     """
+    if datum.encoded:
+        import cv2
+        databytes = np.asarray(bytearray(datum.data), dtype=np.uint8)
+        return cv2.imdecode(databytes, cv2.IMREAD_UNCHANGED).transpose((2,0,1))
     if len(datum.data):
         return np.fromstring(datum.data, dtype=np.uint8).reshape(
             datum.channels, datum.height, datum.width)

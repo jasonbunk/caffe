@@ -1,0 +1,38 @@
+name: "AffineTest"
+
+# LMDB file built with command:
+# ./build/tools/convert_imageset --encoded=1 --encode_type=png --gray=-1 --check_colorchannels=4 examples/images/ examples/images/cat_with_mask.txt examples/images/CatWithMaskLMDB
+
+layer {
+  name: "data_rgb"
+  type: "Data"
+  top: "data_rgb"
+  data_param {
+    source: "examples/images/CatWithMaskLMDB"
+    backend: LMDB
+    batch_size: 1
+  }
+  transform_param {
+    crop_size: 224
+    affine_goal_size_x: 256
+    affine_goal_size_y: 256
+    affine_noise_angle: 15
+    affine_noise_scale: 0.10
+    affine_noise_shear: 0.10
+    affine_noise_translate: 7.0
+  }
+}
+
+layer {
+  name: "conv1"
+  type: "Convolution"
+  bottom: "data_rgb"
+  top: "conv1"
+  convolution_param {
+    num_output: 2
+    kernel_size: 1
+    weight_filler: { type: "xavier" }
+  }
+  param { lr_mult: 1 }
+}
+

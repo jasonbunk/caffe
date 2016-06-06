@@ -28,14 +28,16 @@ using namespace caffe;  // NOLINT(build/namespaces)
 using std::pair;
 using boost::scoped_ptr;
 
-DEFINE_bool(gray, false,
-    "When this option is on, treat images as grayscale ones");
+DEFINE_int32(gray, 0,
+    "When 1, treat images as grayscale; when 0, treat images as color.");
 DEFINE_bool(shuffle, false,
     "Randomly shuffle the order of images and their labels");
 DEFINE_string(backend, "lmdb",
         "The backend {lmdb, leveldb} for storing the result");
 DEFINE_int32(resize_width, 0, "Width images are resized to");
 DEFINE_int32(resize_height, 0, "Height images are resized to");
+DEFINE_int32(check_colorchannels, 0,
+    "If nonzero, check that all datum have this number of color channels");
 DEFINE_bool(check_size, false,
     "When this option is on, check that all the datum have the same size");
 DEFINE_bool(encoded, false,
@@ -66,10 +68,16 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  const bool is_color = !FLAGS_gray;
+  const int is_color = FLAGS_gray == 0 ? 1 : (FLAGS_gray == 1 ? 0 : FLAGS_gray);
   const bool check_size = FLAGS_check_size;
   const bool encoded = FLAGS_encoded;
+  const int check_colorchannels = FLAGS_check_colorchannels;
   const string encode_type = FLAGS_encode_type;
+
+  LOG(INFO) << "Reading images as " <<
+    (is_color == 0 ? "CV_LOAD_IMAGE_GRAYSCALE" :
+    (is_color == 1 ? "CV_LOAD_IMAGE_COLOR" : 
+    (is_color == -1 ? "CV_LOAD_IMAGE_UNCHANGED" : "?")));
 
   std::ifstream infile(argv[2]);
   std::vector<std::pair<std::string, int> > lines;
@@ -131,6 +139,10 @@ int main(int argc, char** argv) {
         CHECK_EQ(data.size(), data_size) << "Incorrect data field size "
             << data.size();
       }
+    }
+    if (check_colorchannels > 0) {
+      CHECK_EQ(datum.channels(), check_colorchannels)
+        << lines[line_id].first << " had " << datum.channels() << " channels!";
     }
     // sequential
     string key_str = caffe::format_int(line_id, 8) + "_" + lines[line_id].first;
