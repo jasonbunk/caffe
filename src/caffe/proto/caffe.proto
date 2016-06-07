@@ -430,22 +430,31 @@ message TransformationParameter {
   // NOTE: These require the images to be encoded using OpenCV when creating the
   //       database file. The images should be encoded at a larger size, as they
   //       will be resized to "goal_size" as part of the transformation.
-  // NOTE: "affine_goal_size_" x and y MUST be set for these to be used.
-  // Images are scaled to "goal_size_" FIRST
+  // NOTE: At least 2/3 of "affine_goal_size_*" and "affine_goal_is_min_dim"
+  //       MUST be set for these to be used.
+  // Images are scaled to "goal_size_" FIRST, before randomness
   optional float affine_goal_size_x = 8 [default = 0];
   optional float affine_goal_size_y = 9 [default = 0];
+  // If this is true, set one of the above; the other will be chosen to maintain
+  // aspect ratio (after affine_aspect_change_* are applied).
+  // NOTE: This option requires "crop_size".
+  optional bool affine_goal_is_min_dim = 10 [default = false];
+  // If it is desired to change the aspect ratio, use one of these
+  // NOTE: only used in conjunction with "affine_goal_is_min_dim"
+  optional float affine_goal_aspect_change_x = 11 [default = 1];
+  optional float affine_goal_aspect_change_y = 12 [default = 1];
   // scale by 1 +/- "affine_noise_scale"
-  optional float affine_noise_scale = 10 [default = 0];
+  optional float affine_noise_scale = 13 [default = 0];
   // rotate by +/- "affine_noise_angle" degrees
-  optional float affine_noise_angle = 11 [default = 0];
-  optional float affine_noise_shear = 12 [default = 0];
+  optional float affine_noise_angle = 14 [default = 0];
+  optional float affine_noise_shear = 15 [default = 0];
   // in pixel units of "goal_size"
-  optional float affine_noise_translate = 13 [default = 0];
+  optional float affine_noise_translate = 16 [default = 0];
   // if using affine transformations with 4-channel images,
   // where the 4th channel is the semantic segmentation label mask,
   // these will help speed up the mask transformations
-  optional int32 num_classes = 14 [default = 255];
-  optional int32 ignore_label = 15;
+  optional int32 num_classes = 17 [default = 255];
+  optional int32 ignore_label = 18;
 }
 
 // Message that stores parameters shared by loss layers

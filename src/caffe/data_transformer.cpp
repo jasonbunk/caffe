@@ -38,9 +38,30 @@ DataTransformer<Dtype>::DataTransformer(const TransformationParameter& param,
       mean_values_.push_back(param_.mean_value(c));
     }
   }
-  if(param_.has_affine_goal_size_x()) {CHECK(param_.has_affine_goal_size_y());}
-  if(param_.has_affine_goal_size_y()) {CHECK(param_.has_affine_goal_size_x());}
-  if(param_.has_affine_goal_size_x() || param_.has_affine_goal_size_y()) {
+  // need 2/3 of affine_goal parameters to use affine transformations
+  if(param_.has_affine_goal_size_x()) {
+    CHECK(param_.has_affine_goal_size_y() || param_.affine_goal_is_min_dim())
+      << "Must specify 2/3 of affine goals";
+    CHECK(param_.has_affine_goal_size_y() == !param_.affine_goal_is_min_dim())
+      << "Affine min dim must have ONE goal size";
+  }
+  if(param_.has_affine_goal_size_y()) {
+    CHECK(param_.has_affine_goal_size_x() || param_.affine_goal_is_min_dim())
+      << "Must specify 2/3 of affine goals";
+    CHECK(param_.has_affine_goal_size_x() == !param_.affine_goal_is_min_dim())
+      << "Affine min dim must have ONE goal size";
+  }
+  if(param_.affine_goal_is_min_dim()) {
+    CHECK(param_.has_affine_goal_size_x() || param_.has_affine_goal_size_y())
+      << "Must specify 2/3 of affine goals";
+    CHECK(param_.has_affine_goal_size_x() == !param_.has_affine_goal_size_y())
+      << "Affine min dim must have ONE goal size";
+    CHECK(param_.has_crop_size())
+      << "Must specify crop size with affine min dimension.";
+  }
+  if(  param_.has_affine_goal_size_x()
+    || param_.has_affine_goal_size_y()
+    || param_.affine_goal_is_min_dim()) {
     LOG(INFO)<<"Will do affine transformations on images as they are loaded.";
   }
 }
@@ -241,10 +262,6 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
                                        Blob<Dtype>* transformed_blob) {
   const int crop_size = param_.crop_size();
   const int img_channels = cv_img.channels();
-  const int img_height = param_.has_affine_goal_size_y() ?
-                                    param_.affine_goal_size_y() : cv_img.rows;
-  const int img_width  = param_.has_affine_goal_size_x() ?
-                                    param_.affine_goal_size_x() : cv_img.cols;
 
   // Check dimensions.
   const int channels = transformed_blob->channels();
@@ -263,14 +280,9 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
   const bool has_mean_values = mean_values_.size() > 0;
 
   CHECK_GT(img_channels, 0);
-
-  Dtype* mean = NULL;
-  if (has_mean_file) {
-    CHECK_EQ(img_channels, data_mean_.channels());
-    CHECK_EQ(img_height, data_mean_.height());
-    CHECK_EQ(img_width, data_mean_.width());
-    mean = data_mean_.mutable_cpu_data();
-  }
+  
+  int img_height = cv_img.rows;
+  int img_width  = cv_img.cols;
   if (has_mean_values) {
     CHECK(mean_values_.size() == 1 || mean_values_.size() == img_channels) <<
      "Specify either 1 mean_value or as many as channels: " << img_channels;
@@ -282,13 +294,38 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
     }
   }
   
+  // check at least 2/3 conditions met
+  // assume checks above passed (either exactly 0/3 or 2/3 met)
+  const bool doaffine = param_.has_affine_goal_size_x()
+    ? (param_.has_affine_goal_size_y() || param_.affine_goal_is_min_dim())
+    : (param_.has_affine_goal_size_y() && param_.affine_goal_is_min_dim());
+  
   cv::Mat affresult;
-  if(param_.has_affine_goal_size_x() && param_.has_affine_goal_size_y()) {
-    float basescaleX= ((float)param_.affine_goal_size_x()) / ((float)cv_img.cols);
-    float basescaleY= ((float)param_.affine_goal_size_y()) / ((float)cv_img.rows);
+  if(doaffine) {
+    float basescaleX = 1.0f;
+    float basescaleY = 1.0f;
+    if(param_.has_affine_goal_size_x() && param_.has_affine_goal_size_y()) {
+      basescaleX = param_.affine_goal_size_x() / ((float)cv_img.cols);
+      basescaleY = param_.affine_goal_size_y() / ((float)cv_img.rows);
+    }
+    else {
+      basescaleY =
+          std::max(param_.affine_goal_size_x(), param_.affine_goal_size_y()) /
+          std::min(static_cast<float>(cv_img.cols)*param_.affine_goal_aspect_change_x(),
+                   static_cast<float>(cv_img.rows)*param_.affine_goal_aspect_change_y());
+      basescaleX = param_.affine_goal_aspect_change_x() * basescaleY;
+      basescaleY = param_.affine_goal_aspect_change_y() * basescaleY;
+    }
+    cv::Size dsize(
+            static_cast<int>(round(basescaleX * ((float)cv_img.cols))),
+            static_cast<int>(round(basescaleY * ((float)cv_img.rows))) );
+    img_height = dsize.height;
+    img_width  = dsize.width;
+    
     float centerX = ((float)cv_img.cols) / 2.0f;
     float centerY = ((float)cv_img.rows) / 2.0f;
-    float randscale=RandFloat(1.0f-param_.affine_noise_scale(), 1.0f+param_.affine_noise_scale());
+    float randscaleX=RandFloat(1.0f-param_.affine_noise_scale(), 1.0f+param_.affine_noise_scale());
+    float randscaleY=RandFloat(1.0f-param_.affine_noise_scale(), 1.0f+param_.affine_noise_scale());
     float angleoff =RandFloat(-param_.affine_noise_angle()*DEG2RADs, param_.affine_noise_angle()*DEG2RADs);
     float shearX   =RandFloat(-param_.affine_noise_shear(), param_.affine_noise_shear());
     float shearY   =RandFloat(-param_.affine_noise_shear(), param_.affine_noise_shear());
@@ -299,11 +336,12 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
     aff_translate_start.at<float>(0,2) = -centerX;
     aff_translate_start.at<float>(1,2) = -centerY;
     
+    // equivalent to a rotation applied AFTER a rescaling
     cv::Mat aff_rotatescale = cv::Mat::eye(3, 3, CV_32F);
-    aff_rotatescale.at<float>(0,0) =  cos(angleoff) * randscale * basescaleX;
-    aff_rotatescale.at<float>(0,1) =  sin(angleoff) * randscale * basescaleY;
-    aff_rotatescale.at<float>(1,0) = -sin(angleoff) * randscale * basescaleX;
-    aff_rotatescale.at<float>(1,1) =  cos(angleoff) * randscale * basescaleY;
+    aff_rotatescale.at<float>(0,0) =  cos(angleoff) * randscaleX * basescaleX;
+    aff_rotatescale.at<float>(0,1) =  sin(angleoff) * randscaleY * basescaleY;
+    aff_rotatescale.at<float>(1,0) = -sin(angleoff) * randscaleX * basescaleX;
+    aff_rotatescale.at<float>(1,1) =  cos(angleoff) * randscaleY * basescaleY;
     
     cv::Mat aff_shear = cv::Mat::eye(3, 3, CV_32F);
     aff_shear.at<float>(0,1) = shearX;
@@ -313,11 +351,19 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
     aff_translate_end.at<float>(0,2) = centerX * basescaleX + rtranslX;
     aff_translate_end.at<float>(1,2) = centerY * basescaleY + rtranslY;
     
-    cv::Size dsize(param_.affine_goal_size_x(), param_.affine_goal_size_y());
     affresult = cv::Mat(dsize, cv_img.type());
-    cv::Mat warpmat = (aff_translate_end * aff_shear * aff_rotatescale * aff_translate_start)(cv::Rect(0, 0, 3, 2));
+    cv::Mat warpmat =
+     (aff_translate_end * aff_shear * aff_rotatescale * aff_translate_start)(cv::Rect(0, 0, 3, 2));
     
     if(img_channels == 4) {
+      CHECK_LE(param_.num_classes(), 255);
+      const int numclasses = param_.num_classes();
+      
+      const bool has_ignore_label = param_.has_ignore_label();
+      if(has_ignore_label) { CHECK_LE(param_.ignore_label(), 255); }
+      const uint8_t ignorelabel =
+                has_ignore_label ? static_cast<uint8_t>(param_.ignore_label()) : 0;
+      
       cv::Mat rgb( cv_img.rows, cv_img.cols, CV_8UC3 );
       cv::Mat alpha( cv_img.rows, cv_img.cols, CV_8UC1 );
       cv::Mat out[] = { rgb, alpha };
@@ -325,7 +371,7 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
       cv::mixChannels( &cv_img, 1, out, 2, from_to, 4 );
       
       rgb.create(dsize, CV_8UC3);
-      alpha = cv::Mat::zeros(dsize, CV_8U);
+      alpha = cv::max(cv::Mat::zeros(dsize, CV_8U), ignorelabel);
       
       cv::warpAffine(out[0], rgb,
         warpmat,
@@ -333,25 +379,29 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
         cv::INTER_LINEAR,
         cv::BORDER_REFLECT_101);
       
-      //cv::imshow("rgb", rgb);
-      
-      cv::Mat thismask;
-      cv::Mat tempout;
+      cv::Mat thismask, tempout;
       
       // warp each label independently
-      CHECK_LE(param_.num_classes(), 255);
-      const int numclasses = param_.num_classes();
-      for(int cc=1; cc<=numclasses; cc++) {
-        const uint8_t thisclass = ((uint8_t)cc);
+      for(int cc=0; cc<=numclasses; cc++) {
+        const uint8_t thisclass = static_cast<uint8_t>(cc);
         thismask = (out[1] == thisclass);
         if(cv::countNonZero(thismask) > 0) {
-          //cv::imshow(format_int(thisclass), thismask);
           tempout.create(dsize, CV_8U);
-          cv::warpAffine(thismask, tempout,
-            warpmat,
-            dsize,
-            cv::INTER_LINEAR,
-            cv::BORDER_REFLECT_101);
+          if(has_ignore_label) {
+            // if has ignore label, fill extrapolated regions with zeros
+            cv::warpAffine(thismask, tempout,
+              warpmat,
+              dsize,
+              cv::INTER_LINEAR,
+              cv::BORDER_CONSTANT);
+          } else {
+            // else extrapolate labels
+            cv::warpAffine(thismask, tempout,
+              warpmat,
+              dsize,
+              cv::INTER_LINEAR,
+              cv::BORDER_REFLECT_101);
+          }
           for(int ii=0; ii<alpha.rows; ii++) {
             for(int jj=0; jj<alpha.cols; jj++) {
               if(tempout.at<uint8_t>(ii,jj) > 127) {
@@ -362,9 +412,7 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
         }
       }
       // warp ignore mask, if needed
-      if(param_.has_ignore_label()) {
-        CHECK_LE(param_.ignore_label(), 255);
-        const uint8_t ignorelabel = (uint8_t)param_.ignore_label();
+      if(has_ignore_label) {
         thismask = (out[1] == ignorelabel);
         if(cv::countNonZero(thismask) > 0) {
           tempout.create(dsize, CV_8U);
@@ -372,7 +420,7 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
             warpmat,
             dsize,
             cv::INTER_LINEAR,
-            cv::BORDER_REFLECT_101);
+            cv::BORDER_CONSTANT);
           for(int ii=0; ii<alpha.rows; ii++) {
             for(int jj=0; jj<alpha.cols; jj++) {
               if(tempout.at<uint8_t>(ii,jj) > 127) {
@@ -382,43 +430,41 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
           }
         }
       }
-      
       out[0] = rgb;
       out[1] = alpha;
-      
-      //cv::imshow("alpha", alpha);
-      //cv::imshow("alpha*200", alpha*200);
-      
       cv::mixChannels( out, 2, &affresult, 1, from_to, 4 );
-      
-      //cv::imshow("affresult", affresult);
-      //cv::waitKey(0);
-    
     } else {
       cv::warpAffine(cv_img, affresult,
         warpmat,
         dsize,
         cv::INTER_LINEAR,
-        cv::BORDER_REFLECT_101); //cv::BORDER_CONSTANT);
+        cv::BORDER_REFLECT_101);
     }
-    //cv::imshow("cv_img",cv_img);
-    //cv::imshow("affresult",affresult);
-    //cv::waitKey(0);
   } else {
-    CHECK_LE(height, img_height);
-    CHECK_LE(width, img_width);
-    CHECK_GE(img_height, crop_size);
-    CHECK_GE(img_width, crop_size);
+    // no affine transformation
     affresult = cv_img;
   }
-
+  
+  CHECK_LE(height, img_height);
+  CHECK_LE(width, img_width);
+  CHECK_GE(img_height, crop_size);
+  CHECK_GE(img_width, crop_size);
+  Dtype* mean = NULL;
+  if (has_mean_file) {
+    CHECK_EQ(img_channels, data_mean_.channels());
+    CHECK_EQ(img_height, data_mean_.height());
+    CHECK_EQ(img_width, data_mean_.width());
+    mean = data_mean_.mutable_cpu_data();
+  }
+  
   int h_off = 0;
   int w_off = 0;
   cv::Mat cv_cropped_img = affresult;
   if (crop_size) {
     CHECK_EQ(crop_size, height);
     CHECK_EQ(crop_size, width);
-    // We only do random crop when we do training, or if we want affine transformations
+    // We only do random crop when we do training,
+    //   or if we want affine transformations
     if (phase_ == TRAIN || param_.has_affine_goal_size_x()) {
       h_off = Rand(img_height - crop_size + 1);
       w_off = Rand(img_width - crop_size + 1);
@@ -637,13 +683,18 @@ template<typename Dtype>
 vector<int> DataTransformer<Dtype>::InferBlobShape(const cv::Mat& cv_img) {
   const int crop_size = param_.crop_size();
   const int img_channels = cv_img.channels();
-  const int img_height = cv_img.rows;
-  const int img_width = cv_img.cols;
+  const int img_height = param_.has_affine_goal_size_y() ?
+                                    param_.affine_goal_size_y() : cv_img.rows;
+  const int img_width  = param_.has_affine_goal_size_x() ?
+                                    param_.affine_goal_size_x() : cv_img.cols;
   // Check dimensions.
   CHECK_GT(img_channels, 0);
   if(param_.has_affine_goal_size_x() && param_.has_affine_goal_size_y()) {
     CHECK_GE(param_.affine_goal_size_x(), crop_size);
     CHECK_GE(param_.affine_goal_size_y(), crop_size);
+  } else if(param_.affine_goal_is_min_dim()) {
+    CHECK_GE(std::max(param_.affine_goal_size_x(), param_.affine_goal_size_y()),
+              crop_size);
   } else {
     CHECK_GE(img_height, crop_size);
     CHECK_GE(img_width, crop_size);

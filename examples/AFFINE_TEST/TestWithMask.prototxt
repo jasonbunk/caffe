@@ -14,12 +14,15 @@ layer {
   }
   transform_param {
     crop_size: 224
+    affine_goal_is_min_dim: 1
     affine_goal_size_x: 256
-    affine_goal_size_y: 256
+    affine_goal_aspect_change_x: 0.75 # squish from 480x360 to 360x360, then shrink to 256x256
     affine_noise_angle: 15
     affine_noise_scale: 0.10
     affine_noise_shear: 0.10
     affine_noise_translate: 7.0
+    ignore_label: 255 # fill extrapolated regions with this ignore label
+    num_classes: 100 # the cat is labelled with pixel intensity 100
   }
 }
 

@@ -27,7 +27,7 @@ def displayable(caffe3chanimage):
 	return np.transpose(caffe3chanimage[:,:,:],(1,2,0)) / 255.0
 
 def applymask(rgb, mask):
-	reshaped = np.reshape(0.3+(mask*0.7),(mask.shape[0],mask.shape[1],1))
+	reshaped = np.reshape(mask,(mask.shape[0],mask.shape[1],1))
 	return np.multiply(rgb, np.repeat(reshaped,3,axis=2))
 
 for ii in range(10000):
@@ -37,7 +37,17 @@ for ii in range(10000):
 	caffeim = nnet.blobs['data_rgb'].data
 	
 	rgbpart = displayable(caffeim[0,:3,:,:])
-	mskpart = caffeim[0, 3,:,:] / 255.0
+	mskpart = caffeim[0, 3,:,:].astype(np.uint8)
+	flatmaskpart = mskpart.flatten()
+	uniquevals = []
+	for jj in range(flatmaskpart.size):
+		if flatmaskpart[jj] not in uniquevals:
+			uniquevals.append(flatmaskpart[jj])
+	print("uniquevals == "+str(uniquevals))
+	mskpart[mskpart == 0  ] = 70
+	mskpart[mskpart == 255] = 0
+	mskpart[mskpart == 100] = 255
+	mskpart = mskpart.astype(np.float32) / 255.0
 	
 	cv2.imshow('rgb',rgbpart)
 	cv2.imshow('mask',mskpart)
