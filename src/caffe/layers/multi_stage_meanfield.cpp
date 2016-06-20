@@ -100,6 +100,8 @@ void MultiStageMeanfieldLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bot
   compute_spatial_kernel(spatial_kernel);
   spatial_lattice_.reset(new ModifiedPermutohedral());
 
+  freebilateralbuffer();
+
   spatial_norm_.Reshape(1, 1, height_, width_);
   Dtype* norm_data_gpu ;
   Dtype*  norm_data;
@@ -264,17 +266,36 @@ void MultiStageMeanfieldLayer<Dtype>::Backward_cpu(
 }
 
 template<typename Dtype>
-MultiStageMeanfieldLayer<Dtype>::~MultiStageMeanfieldLayer(){
-  if(init_cpu){
-      delete[] bilateral_kernel_buffer_;
-      delete[] norm_feed_;
-  }
+void MultiStageMeanfieldLayer<Dtype>::freebilateralbuffer() {
+  if(bilateral_kernel_buffer_ != NULL) {
+    if(init_cpu){
+        delete[] bilateral_kernel_buffer_;
+        bilateral_kernel_buffer_ = NULL;
+    }
   #ifndef CPU_ONLY
-  if(init_gpu){
-      CUDA_CHECK(cudaFree(bilateral_kernel_buffer_));
-      CUDA_CHECK(cudaFree(norm_feed_));
-  }
+    if(init_gpu){
+        CUDA_CHECK(cudaFree(bilateral_kernel_buffer_));
+        bilateral_kernel_buffer_ = NULL;
+    }
   #endif
+  }
+  if(norm_feed_ != NULL) {
+    if(init_cpu){
+        delete[] norm_feed_;
+        norm_feed_ = NULL;
+    }
+  #ifndef CPU_ONLY
+    if(init_gpu){
+        CUDA_CHECK(cudaFree(norm_feed_));
+        norm_feed_ = NULL;
+    }
+  #endif
+  }
+}
+
+template<typename Dtype>
+MultiStageMeanfieldLayer<Dtype>::~MultiStageMeanfieldLayer(){
+  freebilateralbuffer();
 }
 
 template<typename Dtype>

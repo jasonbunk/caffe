@@ -17,7 +17,8 @@ template <typename Dtype>
 class MultiStageMeanfieldLayer : public Layer<Dtype> {
 
  public:
-  explicit MultiStageMeanfieldLayer(const LayerParameter& param) : Layer<Dtype>(param) {}
+  explicit MultiStageMeanfieldLayer(const LayerParameter& param) : Layer<Dtype>(param),
+                             norm_feed_(NULL), bilateral_kernel_buffer_(NULL) {}
 
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
@@ -80,6 +81,8 @@ class MultiStageMeanfieldLayer : public Layer<Dtype> {
   shared_ptr<ModifiedPermutohedral> spatial_lattice_;
   float* bilateral_kernel_buffer_;
   vector<shared_ptr<ModifiedPermutohedral> > bilateral_lattices_;
+  
+  void freebilateralbuffer();
 };
 }
 
