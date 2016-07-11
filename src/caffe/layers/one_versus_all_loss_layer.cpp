@@ -22,7 +22,7 @@ void OneVersusAllLossLayer<Dtype>::Reshape(
   LossLayer<Dtype>::Reshape(bottom, top);
   CHECK_EQ(bottom[0]->count(), bottom[1]->count()) <<
       "ONE_VERSUS_ALL_LOSS layer inputs must have the same count.";
-      
+  
   int numinbatch = bottom[0]->shape(0);
   int batchdim   = bottom[0]->count() / numinbatch;
   int spatialdim = bottom[0]->count() / (numinbatch * bottom[0]->shape(1));
@@ -44,13 +44,12 @@ void OneVersusAllLossLayer<Dtype>::Forward_cpu(
   Dtype loss = 0;
   tsigsum_mul = 0;
   tsigsum_add = 0;
-  const Dtype* input_data = bottom[0]->cpu_data();
   const Dtype* target = bottom[1]->cpu_data();
   const int count = bottom[0]->count();
-  const int num = bottom[0]->num();
 
 
 #if 0
+  const Dtype* input_data = bottom[0]->cpu_data();
   // Compute the loss (negative log likelihood)
   // Stable version of loss computation from input data
   for (int i = 0; i < count; ++i) {
@@ -82,7 +81,6 @@ void OneVersusAllLossLayer<Dtype>::Backward_cpu(
   if (propagate_down[0]) {
     // First, compute the diff
     const int count = bottom[0]->count();
-    const int num = bottom[0]->num();
     const Dtype* sigmoid_output_data = sigmoid_output_->cpu_data();
     const Dtype* target = bottom[1]->cpu_data();
     Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
@@ -109,9 +107,9 @@ void OneVersusAllLossLayer<Dtype>::Backward_cpu(
   }
 }
 
-#ifdef CPU_ONLY
-STUB_GPU_BACKWARD(OneVersusAllLossLayer, Backward);
-#endif
+//#ifdef CPU_ONLY
+//STUB_GPU_BACKWARD(OneVersusAllLossLayer, Backward);
+//#endif
 
 INSTANTIATE_CLASS(OneVersusAllLossLayer);
 REGISTER_LAYER_CLASS(OneVersusAllLoss);

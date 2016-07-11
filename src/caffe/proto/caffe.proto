@@ -306,7 +306,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 150 (last added: smooth_l1_loss_param)
+// LayerParameter next available layer-specific ID: 151 (last added: rbf_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -391,6 +391,7 @@ message LayerParameter {
   optional PowerParameter power_param = 122;
   optional PReLUParameter prelu_param = 131;
   optional PythonParameter python_param = 130;
+  optional RBFParameter rbf_param = 150;
   optional RecurrentParameter recurrent_param = 146;
   optional ReductionParameter reduction_param = 136;
   optional ReLUParameter relu_param = 123;
@@ -982,6 +983,19 @@ message PythonParameter {
   // If true, each worker solver sequentially run forward from this layer.
   // This value should be set true if you are using it as a data layer.
   optional bool share_in_parallel = 4 [default = false];
+}
+
+message RBFParameter {
+  // number of output channels
+  optional uint32 num_output = 1 [default = 0];
+  // number of centroid bases per output channel
+  optional uint32 centroids_per_output = 2 [default = 0];
+  // share one set of centroids for all outputs?
+  optional bool share_centroids = 3 [default = true];
+  
+  optional FillerParameter scalar_filler = 4; // The filler for the scalars
+  optional FillerParameter width_filler = 5; // The filler for the widths
+  optional FillerParameter centroid_filler = 6; // The filler for the centroids
 }
 
 // Message that stores parameters used by RecurrentLayer
