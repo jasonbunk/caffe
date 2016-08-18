@@ -29,11 +29,22 @@ class OneVersusAllLossLayerTest : public MultiDeviceTest<TypeParam> {
     data_filler.Fill(blob_bottom_data_);
     blob_bottom_vec_.push_back(blob_bottom_data_);
     // Fill the targets vector
-    FillerParameter targets_filler_param;
+    /*FillerParameter targets_filler_param;
     targets_filler_param.set_min(0);
     targets_filler_param.set_max(1);
     UniformFiller<Dtype> targets_filler(targets_filler_param);
-    targets_filler.Fill(blob_bottom_targets_);
+    targets_filler.Fill(blob_bottom_targets_);*/
+    int temp;
+    for (int i = 0; i < blob_bottom_targets_->count(); ++i) {
+      temp = caffe_rng_rand() % 12;
+      assert(temp < 12);
+      if(temp < 11) {
+        blob_bottom_targets_->mutable_cpu_data()[i] =
+                                          ((Dtype)temp) / ((Dtype)10);
+      } else {
+        blob_bottom_targets_->mutable_cpu_data()[i] = 253; // ignore label
+      }
+    }
     blob_bottom_vec_.push_back(blob_bottom_targets_);
     blob_top_vec_.push_back(blob_top_loss_);
   }
@@ -57,6 +68,7 @@ TYPED_TEST(OneVersusAllLossLayerTest, TestGradient) {
   LayerParameter layer_param;
   const Dtype kLossWeight = 3.7;
   layer_param.add_loss_weight(kLossWeight);
+  layer_param.mutable_loss_param()->set_ignore_label(253);
   OneVersusAllLossLayer<Dtype> layer(layer_param);
   layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
   GradientChecker<Dtype> checker(1e-2, 1e-2, 1701);

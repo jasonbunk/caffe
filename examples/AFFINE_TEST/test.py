@@ -1,5 +1,5 @@
 import numpy as np
-import os, sys
+import os, sys, time
 caffe_root = os.path.dirname(os.path.abspath(__file__))+'/../../'
 sys.path.insert(0, caffe_root+'python')
 #os.environ['GLOG_minloglevel'] = '2'
@@ -19,16 +19,20 @@ if not os.path.isdir(caffe_root+'examples/images/CatLMDB'):
 			caffe_root+'examples/images/CatLMDB'])
 
 caffe.set_mode_cpu()
-nnet = caffe.Net(caffe_root+'examples/AFFINE_TEST/Test.prototxt', caffe.TRAIN)
+nnet = caffe.Net(caffe_root+'examples/AFFINE_TEST/Test.prototxt', caffe.TEST)
 
 def displayable(caffeimage):
 	return np.transpose(caffeimage[0,:,:,:],(1,2,0)) / 255.0
 
 for ii in range(10000):
 
+	beftime = time.time()
 	nnet.forward()
+	afttime = time.time()
 
 	caffeim = nnet.blobs['data_rgb'].data
+
+	print("nnet.blobs[conv1].data.shape == "+str(nnet.blobs['conv1'].data.shape)+" ... forward time: "+str(afttime - beftime)+" seconds")
 
 	cv2.imshow('caffe-im', displayable(caffeim))
 	cv2.waitKey(0)

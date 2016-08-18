@@ -90,6 +90,11 @@ class OneVersusAllLossLayer : public LossLayer<Dtype> {
   
   Dtype tsigsum_mul, tsigsum_add;
   
+  /// Whether to ignore instances with a certain label.
+  bool has_ignore_label_;
+  /// The label indicating that an instance should be ignored.
+  int ignore_label_;
+
   /// The internal SigmoidLayer used to map predictions to probabilities.
   shared_ptr<SigmoidLayer<Dtype> > sigmoid_layer_;
   /// sigmoid_output stores the output of the SigmoidLayer.

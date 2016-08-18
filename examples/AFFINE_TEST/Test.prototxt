@@ -13,9 +13,9 @@ layer {
     batch_size: 1
   }
   transform_param {
-    crop_size: 224
-    affine_goal_size_x: 256
-    affine_goal_size_y: 256
+    crop_size: 256
+    affine_goal_size_x: 260
+    affine_goal_size_y: 260
     affine_noise_angle: 15
     affine_noise_scale: 0.10
     affine_noise_shear: 0.10
@@ -29,10 +29,23 @@ layer {
   bottom: "data_rgb"
   top: "conv1"
   convolution_param {
-    num_output: 2
+    num_output: 64
     kernel_size: 1
+    stride: 4
     weight_filler: { type: "xavier" }
   }
   param { lr_mult: 1 }
 }
 
+layer {
+  name: "rbf1"
+  type: "RBF"
+  bottom: "conv1"
+  top: "rbf1"
+  rbf_param {
+    num_output: 1
+    centroids_per_output: 256
+    share_centroids: 1
+  }
+  param { lr_mult: 1 }
+}

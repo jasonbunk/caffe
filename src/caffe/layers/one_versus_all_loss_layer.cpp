@@ -14,6 +14,11 @@ void OneVersusAllLossLayer<Dtype>::LayerSetUp(
   sigmoid_top_vec_.clear();
   sigmoid_top_vec_.push_back(sigmoid_output_.get());
   sigmoid_layer_->SetUp(sigmoid_bottom_vec_, sigmoid_top_vec_);
+  
+  has_ignore_label_ = this->layer_param_.loss_param().has_ignore_label();
+  if (has_ignore_label_) {
+    ignore_label_ = this->layer_param_.loss_param().ignore_label();
+  }
 }
 
 template <typename Dtype>
@@ -58,6 +63,12 @@ void OneVersusAllLossLayer<Dtype>::Forward_cpu(
   }
 #else
   for (int i = 0; i < count; ++i) {
+    if (has_ignore_label_ && target[i] == ignore_label_) {
+      continue;
+    }
+    CHECK(target[i] >= 0.0 && target[i] <= 1.0)
+          <<" target was "<<target[i]<<", ignore_label_: "
+          <<(has_ignore_label_ ? ignore_label_ : -999999);
     tsigsum_mul += target[i] * sigmoid_output_data[i];
     tsigsum_add += target[i] + sigmoid_output_data[i];
   }
@@ -91,8 +102,10 @@ void OneVersusAllLossLayer<Dtype>::Backward_cpu(
 #else
   if(tsigsum_mul > kLOG_THRESHOLD && tsigsum_add > kLOG_THRESHOLD) {
     for (int i = 0; i < count; ++i) {
-      dsig = sigmoid_output_data[i] * (1 - sigmoid_output_data[i]);
-      bottom_diff[i] = -target[i] * dsig / tsigsum_mul + dsig / tsigsum_add;
+      if (has_ignore_label_ == false || target[i] != ignore_label_) {
+        dsig = sigmoid_output_data[i] * (1 - sigmoid_output_data[i]);
+        bottom_diff[i] = -target[i] * dsig / tsigsum_mul + dsig / tsigsum_add;
+      }
     }
   } else {
     for (int i = 0; i < count; ++i)

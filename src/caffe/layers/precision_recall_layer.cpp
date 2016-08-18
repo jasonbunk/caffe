@@ -98,7 +98,7 @@ void PrecisionRecallLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
   top[0]->mutable_cpu_data()[0] = precis;
   top[0]->mutable_cpu_data()[1] = recall;
   //top[0]->mutable_cpu_data()[2] = specifcity;
-  top[0]->mutable_cpu_data()[2] = hmdenom <= 0.0 ? 0.0 : (2.0 * precis * recall / hmdenom);
+  top[0]->mutable_cpu_data()[2] = hmdenom <= kLOG_THRESHOLD ? 0.0 : (2.0 * precis * recall / hmdenom);
   //top[0]->mutable_cpu_data()[3] = hmdenom <= 0.0 ? 0.0 : (2.0 * specifcity * recall / hmdenom);
   
   //accuracy
