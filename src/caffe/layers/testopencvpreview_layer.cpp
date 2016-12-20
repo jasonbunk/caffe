@@ -21,34 +21,7 @@ void TestOpenCVPreviewLayer<Dtype>::Forward_cpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   const Dtype* bottom_data = bottom[0]->cpu_data();
   caffe_copy(bottom[0]->count(), bottom_data, top[0]->mutable_cpu_data());
-
-  CHECK_EQ(bottom[0]->num_axes(), 4);
-  const int nbatch = bottom[0]->shape(0);
-  const int nchans = MINOF2(bottom[0]->shape(1),3);
-  const int nrows = bottom[0]->shape(2);
-  const int ncols = bottom[0]->shape(3);
-  const int bytesperchan = ncols*nrows*sizeof(Dtype);
-  std::vector< cv::Mat_<Dtype> > testimgchans;
-  for(int cc=0; cc<nchans; ++cc) {
-    testimgchans.push_back(cv::Mat_<Dtype>(nrows, ncols));
-  }
-  cv::Mat mergedmat;
-  double minval,maxval,globalmin,globalmax;
-  globalmin = 1e20; globalmax = -1e20;
-
-  for(int mm=0; mm<nbatch; ++mm) {
-    for(int cc=0; cc<nchans; ++cc) {
-      memcpy(testimgchans[cc].data,
-             bottom_data + bottom[0]->offset(mm, cc, 0, 0),
-             bytesperchan);
-      cv::minMaxIdx(testimgchans[cc], &minval, &maxval);
-      globalmin = MINOF2(globalmin, minval);
-      globalmax = MAXOF2(globalmax, maxval);
-    }
-    cv::merge(testimgchans, mergedmat);
-    cv::imshow("caffe-img", (mergedmat-globalmin)/(globalmax-globalmin));
-    cv::waitKey(0);
-  }
+  visualize_buf(bottom[0]);
 }
 
 template <typename Dtype>
@@ -62,9 +35,38 @@ void TestOpenCVPreviewLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top
   }
 }
 
-#ifdef CPU_ONLY
-STUB_GPU(TestOpenCVPreviewLayer);
-#endif
+template <typename Dtype>
+void TestOpenCVPreviewLayer<Dtype>::visualize_buf(Blob<Dtype> const* buf) const {
+    const Dtype* buf_data = buf->cpu_data();
+    CHECK_EQ(buf->num_axes(), 4);
+    const int nbatch = buf->shape(0);
+    const int nchans = MINOF2(buf->shape(1),3);
+    const int nrows = buf->shape(2);
+    const int ncols = buf->shape(3);
+    const int bytesperchan = ncols*nrows*sizeof(Dtype);
+    std::vector< cv::Mat_<Dtype> > testimgchans;
+    for(int cc=0; cc<nchans; ++cc) {
+      testimgchans.push_back(cv::Mat_<Dtype>(nrows, ncols));
+    }
+    cv::Mat mergedmat;
+    double minval,maxval,globalmin,globalmax;
+    globalmin = 1e20; globalmax = -1e20;
+
+    for(int mm=0; mm<nbatch; ++mm) {
+      for(int cc=0; cc<nchans; ++cc) {
+        memcpy(testimgchans[cc].data,
+               buf_data + buf->offset(mm, cc, 0, 0),
+               bytesperchan);
+        cv::minMaxIdx(testimgchans[cc], &minval, &maxval);
+        globalmin = MINOF2(globalmin, minval);
+        globalmax = MAXOF2(globalmax, maxval);
+      }
+      std::cout<<"caffe-img (displayed): (min,max) = ("<<globalmin<<", "<<globalmax<<")"<<std::endl;
+      cv::merge(testimgchans, mergedmat);
+      cv::imshow("caffe-img", (mergedmat-globalmin)/(globalmax-globalmin));
+      cv::waitKey(0);
+    }
+}
 
 INSTANTIATE_CLASS(TestOpenCVPreviewLayer);
 REGISTER_LAYER_CLASS(TestOpenCVPreview);
