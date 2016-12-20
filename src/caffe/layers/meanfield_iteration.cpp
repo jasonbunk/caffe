@@ -31,7 +31,8 @@ void MeanfieldIteration<Dtype>::OneTimeSetUp(
     Blob<Dtype>* const softmax_input,
     Blob<Dtype>* const output_blob,
     const shared_ptr<ModifiedPermutohedral> spatial_lattice,
-    const Blob<Dtype>* const spatial_norm) {
+    const Blob<Dtype>* const spatial_norm,
+    bool do_softmax) {
 
   spatial_lattice_ = spatial_lattice;
   spatial_norm_ = spatial_norm;
@@ -42,6 +43,8 @@ void MeanfieldIteration<Dtype>::OneTimeSetUp(
   height_ = unary_terms->height();
   width_ = unary_terms->width();
   num_pixels_ = height_ * width_;
+
+  do_softmax_ = do_softmax;
 
   if (this->blobs_.size() > 0) {
     LOG(INFO) << "Meanfield iteration skipping parameter initialization.";
@@ -110,7 +113,11 @@ void MeanfieldIteration<Dtype>::Forward_cpu() {
 
 
   //------------------------------- Softmax normalization--------------------
-  softmax_layer_->Forward(softmax_bottom_vec_, softmax_top_vec_);
+  if(do_softmax_) {
+    softmax_layer_->Forward(softmax_bottom_vec_, softmax_top_vec_);
+  } else {
+    softmax_top_vec_[0]->CopyFrom(*(softmax_bottom_vec_[0]));
+  }
 
   //-----------------------------------Message passing-----------------------
   for (int n = 0; n < num_; ++n) {
@@ -276,10 +283,13 @@ void MeanfieldIteration<Dtype>::Backward_cpu() {
   }
 
   //--------------------------------------------------------------------------------
-  vector<bool> propagate_down(2, true);
-  softmax_layer_->Backward(softmax_top_vec_, propagate_down, softmax_bottom_vec_);
+  if(do_softmax_) {
+    vector<bool> propagate_down(2, true);
+    softmax_layer_->Backward(softmax_top_vec_, propagate_down, softmax_bottom_vec_);
+  } else {
+    softmax_top_vec_[0]->CopyFrom(*(softmax_bottom_vec_[0]), true);
+  }
 }
 
 INSTANTIATE_CLASS(MeanfieldIteration);
 }  // namespace caffe
-

@@ -41,6 +41,8 @@ void MultiStageMeanfieldLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bot
   theta_beta_ = meanfield_param.theta_beta();
   theta_gamma_ = meanfield_param.theta_gamma();
 
+  do_softmax_ = meanfield_param.do_softmax();
+
   count_ = bottom[0]->count();
   num_ = bottom[0]->num();
   channels_ = bottom[0]->channels();
@@ -67,22 +69,37 @@ void MultiStageMeanfieldLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bot
     caffe_set(channels_ * channels_, Dtype(0.), this->blobs_[1]->mutable_cpu_data());
 
     // Initialize the kernels weights. The two files spatial.par and bilateral.par should be available.
+    double temp;
     FILE * pFile;
     pFile = fopen("spatial.par", "r");
-    CHECK(pFile) << "The file 'spatial.par' is not found. Please create it with initial spatial kernel weights.";
-    for (int i = 0; i < channels_; i++) {
-      double temp = (double)this->blobs_[0]->mutable_cpu_data()[i * channels_ + i];
-      if(fscanf(pFile, "%lf", &temp) != 1){LOG(FATAL)<<"Error writing to spatial.par";}
+    if(pFile == NULL) {
+      LOG(INFO) << "spatial.par not found, so initializing spatial kernel weight from prototxt param spatial_filter_weight = "<<meanfield_param.spatial_filter_weight();
+      for (int i = 0; i < channels_; i++) {
+        this->blobs_[0]->mutable_cpu_data()[i * channels_ + i] = meanfield_param.spatial_filter_weight();
+      }
+    } else {
+      LOG(INFO) << "spatial.par found, so initializing spatial kernel weight from spatial.par";
+      for (int i = 0; i < channels_; i++) {
+        if(fscanf(pFile, "%lf", &temp) != 1){LOG(FATAL)<<"Error writing to spatial.par";}
+        this->blobs_[0]->mutable_cpu_data()[i * channels_ + i] = temp;
+      }
+      fclose(pFile);
     }
-    fclose(pFile);
 
     pFile = fopen("bilateral.par", "r");
-    CHECK(pFile) << "The file 'bilateral.par' is not found. Please create it with initial bilateral kernel weights.";
-    for (int i = 0; i < channels_; i++) {
-      double temp = (double)this->blobs_[1]->mutable_cpu_data()[i * channels_ + i];
-      if(fscanf(pFile, "%lf", &temp) != 1){LOG(FATAL)<<"Error writing to bilateral.par";}
+    if(pFile == NULL) {
+      LOG(INFO) << "bilateral.par not found, so initializing bilateral kernel weight from prototxt param bilateral_filter_weight = "<<meanfield_param.bilateral_filter_weight();
+      for (int i = 0; i < channels_; i++) {
+        this->blobs_[1]->mutable_cpu_data()[i * channels_ + i] = meanfield_param.bilateral_filter_weight();
+      }
+    } else {
+      LOG(INFO) << "bilateral.par found, so initializing bilateral kernel weight from bilateral.par";
+      for (int i = 0; i < channels_; i++) {
+        if(fscanf(pFile, "%lf", &temp) != 1){LOG(FATAL)<<"Error writing to bilateral.par";}
+        this->blobs_[1]->mutable_cpu_data()[i * channels_ + i] = temp;
+      }
+      fclose(pFile);
     }
-    fclose(pFile);
 
     // Initialize the compatibility matrix.
     this->blobs_[2].reset(new Blob<Dtype>(1, 1, channels_, channels_));
@@ -96,14 +113,18 @@ void MultiStageMeanfieldLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bot
 
   // Initialize the spatial lattice. This does not need to be computed for every image because we use a fixed size.
   float spatial_kernel[2 * num_pixels_];
+#ifndef CPU_ONLY
   float *spatial_kernel_gpu_;
+#endif
   compute_spatial_kernel(spatial_kernel);
   spatial_lattice_.reset(new ModifiedPermutohedral());
 
   freebilateralbuffer();
 
   spatial_norm_.Reshape(1, 1, height_, width_);
-  Dtype* norm_data_gpu ;
+#ifndef CPU_ONLY
+  Dtype* norm_data_gpu;
+#endif
   Dtype*  norm_data;
   // Initialize the spatial lattice. This does not need to be computed for every image because we use a fixed size.
   switch (Caffe::mode()) {
@@ -126,7 +147,7 @@ void MultiStageMeanfieldLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bot
       CUDA_CHECK(cudaMalloc((void**)&norm_feed_, num_pixels_ * sizeof(Dtype))) ;
       caffe_gpu_set(num_pixels_, Dtype(1.0), norm_feed_);
       norm_data_gpu = spatial_norm_.mutable_gpu_data();
-      spatial_lattice_->compute(norm_data_gpu, norm_feed_, 1); 
+      spatial_lattice_->compute(norm_data_gpu, norm_feed_, 1);
       norm_data = spatial_norm_.mutable_cpu_data();
       CUDA_CHECK(cudaMalloc((void**)&bilateral_kernel_buffer_, 5 * num_pixels_ * sizeof(float))) ;
       CUDA_CHECK(cudaFree(spatial_kernel_gpu_));
@@ -136,7 +157,7 @@ void MultiStageMeanfieldLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bot
     default:
     LOG(FATAL) << "Unknown caffe mode.";
   }
-  
+
   for (int i = 0; i < num_pixels_; ++i) {
     norm_data[i] = 1.0f / (norm_data[i] + 1e-20f);
   }
@@ -178,7 +199,8 @@ void MultiStageMeanfieldLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bot
         (i == 0) ? bottom[1] : iteration_output_blobs_[i - 1].get(), // softmax input
         (i == num_iterations_ - 1) ? top[0] : iteration_output_blobs_[i].get(), // output blob
         spatial_lattice_, // spatial lattice
-        &spatial_norm_); // spatial normalization factors.
+        &spatial_norm_, // spatial normalization factors.
+        do_softmax_);
   }
 
   this->param_propagate_down_.resize(this->blobs_.size(), true);
@@ -226,9 +248,7 @@ void MultiStageMeanfieldLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bo
   }
 
   for (int i = 0; i < num_iterations_; ++i) {
-
     meanfield_iterations_[i]->PrePass(this->blobs_, &bilateral_lattices_, &bilateral_norms_);
-
     meanfield_iterations_[i]->Forward_cpu();
   }
 }
@@ -325,4 +345,3 @@ void MultiStageMeanfieldLayer<Dtype>::compute_spatial_kernel(float* const output
 INSTANTIATE_CLASS(MultiStageMeanfieldLayer);
 REGISTER_LAYER_CLASS(MultiStageMeanfield);
 }  // namespace caffe
-

@@ -29,7 +29,8 @@ class MeanfieldIteration {
       Blob<Dtype>* const softmax_input,
       Blob<Dtype>* const output_blob,
       const shared_ptr<ModifiedPermutohedral> spatial_lattice,
-      const Blob<Dtype>* const spatial_norm);
+      const Blob<Dtype>* const spatial_norm,
+      bool do_softmax);
 
   /**
    * Must be invoked before invoking {@link Forward_cpu()}
@@ -70,6 +71,8 @@ class MeanfieldIteration {
   int width_;
   int num_pixels_;
 
+  bool do_softmax_;
+
   Blob<Dtype> spatial_out_blob_;
   Blob<Dtype> bilateral_out_blob_;
   Blob<Dtype> pairwise_;
@@ -96,4 +99,3 @@ class MeanfieldIteration {
 }
 
 #endif
-

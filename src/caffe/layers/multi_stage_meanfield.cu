@@ -20,11 +20,11 @@
 #include "caffe/layers/multi_stage_meanfield.hpp"
 
 namespace caffe {
-  
+
 // Avoid divergence by uncoalescing access
 template <typename Dtype>
-__global__ void  computeBilateralKernel(const  int num_pixels_, 
-    const Dtype* const rgb_blob, 
+__global__ void  computeBilateralKernel(const  int num_pixels_,
+    const Dtype* const rgb_blob,
     const int width_, const int height_, const int channels_,
     float theta_alpha_, float theta_beta_,
     const int n, float* const output_kernel) {
@@ -90,7 +90,7 @@ void MultiStageMeanfieldLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bo
 /**
  * Backprop through filter-based mean field inference.
  */
- 
+
 template<typename Dtype>
 void MultiStageMeanfieldLayer<Dtype>::Backward_gpu(
     const vector<Blob<Dtype>*>& top, const vector<bool>& propagate_down,

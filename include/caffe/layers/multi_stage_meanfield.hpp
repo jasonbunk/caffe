@@ -26,11 +26,11 @@ class MultiStageMeanfieldLayer : public Layer<Dtype> {
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
 
-  virtual inline const char* type() const { 
-    return "MultiStageMeanfield"; 
+  virtual inline const char* type() const {
+    return "MultiStageMeanfield";
   }
   virtual ~MultiStageMeanfieldLayer();
-  
+
   virtual inline int ExactNumBottomBlobs() const { return 3; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
 
@@ -60,11 +60,13 @@ class MultiStageMeanfieldLayer : public Layer<Dtype> {
 
   bool init_cpu;
   bool init_gpu;
-  
+
   Dtype theta_alpha_;
   Dtype theta_beta_;
   Dtype theta_gamma_;
   int num_iterations_;
+
+  bool do_softmax_;
 
   Dtype* norm_feed_;
   Blob<Dtype> spatial_norm_;
@@ -81,10 +83,9 @@ class MultiStageMeanfieldLayer : public Layer<Dtype> {
   shared_ptr<ModifiedPermutohedral> spatial_lattice_;
   float* bilateral_kernel_buffer_;
   vector<shared_ptr<ModifiedPermutohedral> > bilateral_lattices_;
-  
+
   void freebilateralbuffer();
 };
 }
 
 #endif
-

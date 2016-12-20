@@ -32,7 +32,11 @@ void MeanfieldIteration<Dtype>::Forward_gpu() {
 
 
   //------------------------------- Softmax normalization--------------------
-  softmax_layer_->Forward(softmax_bottom_vec_, softmax_top_vec_);
+  if(do_softmax_) {
+    softmax_layer_->Forward(softmax_bottom_vec_, softmax_top_vec_);
+  } else {
+    softmax_top_vec_[0]->CopyFrom(*(softmax_bottom_vec_[0]));
+  }
 
   //-----------------------------------Message passing-----------------------
   for (int n = 0; n < num_; ++n) {
@@ -179,8 +183,12 @@ void MeanfieldIteration<Dtype>::Backward_gpu() {
   }
 
   //--------------------------------------------------------------------------------
-  vector<bool> propagate_down(2, true);
-  softmax_layer_->Backward(softmax_top_vec_, propagate_down, softmax_bottom_vec_);
+  if(do_softmax_) {
+    vector<bool> propagate_down(2, true);
+    softmax_layer_->Backward(softmax_top_vec_, propagate_down, softmax_bottom_vec_);
+  } else {
+    softmax_top_vec_[0]->CopyFrom(*(softmax_bottom_vec_[0]), true);
+  }
 }
 // Instantiate class
 template void MeanfieldIteration<float>::Forward_gpu();
