@@ -178,12 +178,13 @@ ifneq ($(CPU_ONLY), 1)
 	LIBRARIES := cudart cublas curand
 endif
 
-LIBRARIES += glog gflags protobuf boost_system boost_filesystem m hdf5_hl hdf5
+LIBRARIES += glog gflags protobuf boost_system boost_filesystem m
 
 # handle IO dependencies
 USE_LEVELDB ?= 1
 USE_LMDB ?= 1
 USE_OPENCV ?= 1
+HDF5SERIAL ?= 1
 
 ifeq ($(USE_LEVELDB), 1)
 	LIBRARIES += leveldb snappy
@@ -198,6 +199,12 @@ ifeq ($(USE_OPENCV), 1)
 		LIBRARIES += opencv_imgcodecs
 	endif
 
+endif
+ifeq ($(HDF5SERIAL), 1)
+	INCLUDE_DIRS += /usr/include/hdf5/serial
+	LIBRARIES += hdf5_serial_hl hdf5_serial
+else
+	LIBRARIES += hdf5_hl hdf5
 endif
 PYTHON_LIBRARIES ?= boost_python python2.7
 WARNINGS := -Wall -Wno-sign-compare
