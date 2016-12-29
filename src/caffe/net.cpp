@@ -994,6 +994,6 @@ const shared_ptr<Layer<Dtype> > Net<Dtype>::layer_by_name(
   return layer_ptr;
 }
 
-INSTANTIATE_CLASS(Net);
+INSTANTIATE_CLASS_df(Net);
 
 }  // namespace caffe

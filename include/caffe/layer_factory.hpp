@@ -124,17 +124,36 @@ class LayerRegisterer {
 };
 
 
-#define REGISTER_LAYER_CREATOR(type, creator)                                  \
-  static LayerRegisterer<float> g_creator_f_##type(#type, creator<float>);     \
-  static LayerRegisterer<double> g_creator_d_##type(#type, creator<double>)    \
+#define REGISTER_LAYER_CREATOR_f(type, creator)                                \
+  static LayerRegisterer<float> g_creator_f_##type(#type, creator<float>)
 
-#define REGISTER_LAYER_CLASS(type)                                             \
+#define REGISTER_LAYER_CREATOR_df(type, creator)                               \
+  static LayerRegisterer<float> g_creator_f_##type(#type, creator<float>);     \
+  static LayerRegisterer<double> g_creator_d_##type(#type, creator<double>)
+
+#define REGISTER_LAYER_CLASS_f(type)                                           \
   template <typename Dtype>                                                    \
   shared_ptr<Layer<Dtype> > Creator_##type##Layer(const LayerParameter& param) \
   {                                                                            \
     return shared_ptr<Layer<Dtype> >(new type##Layer<Dtype>(param));           \
   }                                                                            \
-  REGISTER_LAYER_CREATOR(type, Creator_##type##Layer)
+  REGISTER_LAYER_CREATOR_f(type, Creator_##type##Layer)
+
+#define REGISTER_LAYER_CLASS_df(type)                                          \
+  template <typename Dtype>                                                    \
+  shared_ptr<Layer<Dtype> > Creator_##type##Layer(const LayerParameter& param) \
+  {                                                                            \
+    return shared_ptr<Layer<Dtype> >(new type##Layer<Dtype>(param));           \
+  }                                                                            \
+  REGISTER_LAYER_CREATOR_df(type, Creator_##type##Layer)
+
+#ifdef NODOUBLEINSTANTIATION
+#define REGISTER_LAYER_CREATOR(type,creator) REGISTER_LAYER_CREATOR_f(type,creator)
+#define REGISTER_LAYER_CLASS(type) REGISTER_LAYER_CLASS_f(type)
+#else
+#define REGISTER_LAYER_CREATOR(type,creator) REGISTER_LAYER_CREATOR_df(type,creator)
+#define REGISTER_LAYER_CLASS(type) REGISTER_LAYER_CLASS_df(type)
+#endif
 
 }  // namespace caffe
 

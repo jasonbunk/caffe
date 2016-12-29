@@ -22,6 +22,6 @@ void Layer<Dtype>::Unlock() {
   }
 }
 
-INSTANTIATE_CLASS(Layer);
+INSTANTIATE_CLASS_df(Layer);
 
 }  // namespace caffe

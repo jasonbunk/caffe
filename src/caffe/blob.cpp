@@ -535,9 +535,8 @@ void Blob<float>::ToProto(BlobProto* proto, bool write_diff) const {
   }
 }
 
-INSTANTIATE_CLASS(Blob);
+INSTANTIATE_CLASS_df(Blob);
 template class Blob<int>;
 template class Blob<unsigned int>;
 
 }  // namespace caffe
-
