@@ -36,7 +36,7 @@ void TestOpenCVPreviewLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top
 }
 
 template <typename Dtype>
-void TestOpenCVPreviewLayer<Dtype>::visualize_buf(Blob<Dtype> const* buf) const {
+void visualize_buf(Blob<Dtype> const* buf) {
     const Dtype* buf_data = buf->cpu_data();
     CHECK_EQ(buf->num_axes(), 4);
     const int nbatch = buf->shape(0);
@@ -67,6 +67,10 @@ void TestOpenCVPreviewLayer<Dtype>::visualize_buf(Blob<Dtype> const* buf) const 
       cv::waitKey(0);
     }
 }
+
+// instantiate
+template void visualize_buf(Blob<float> const* buf);
+template void visualize_buf(Blob<double> const* buf);
 
 INSTANTIATE_CLASS(TestOpenCVPreviewLayer);
 REGISTER_LAYER_CLASS(TestOpenCVPreview);
