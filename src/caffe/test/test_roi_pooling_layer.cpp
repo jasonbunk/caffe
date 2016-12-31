@@ -25,8 +25,6 @@ using boost::scoped_ptr;
 
 namespace caffe {
 
-typedef ::testing::Types<GPUDevice<float>, GPUDevice<double> > TestDtypesGPU;
-
 template <typename TypeParam>
 class ROIPoolingLayerTest : public MultiDeviceTest<TypeParam> {
   typedef typename TypeParam::Dtype Dtype;

@@ -38,7 +38,11 @@ class MultiDeviceTest : public ::testing::Test {
   virtual ~MultiDeviceTest() {}
 };
 
+#ifdef NODOUBLEINSTANTIATION
+typedef ::testing::Types<float> TestDtypes;
+#else
 typedef ::testing::Types<float, double> TestDtypes;
+#endif
 
 template <typename TypeParam>
 struct CPUDevice {
@@ -52,8 +56,11 @@ class CPUDeviceTest : public MultiDeviceTest<CPUDevice<Dtype> > {
 
 #ifdef CPU_ONLY
 
-typedef ::testing::Types<CPUDevice<float>,
-                         CPUDevice<double> > TestDtypesAndDevices;
+#ifdef NODOUBLEINSTANTIATION
+typedef ::testing::Types<CPUDevice<float> > TestDtypesAndDevices;
+#else
+typedef ::testing::Types<CPUDevice<float>, CPUDevice<double> > TestDtypesAndDevices;
+#endif
 
 #else
 
@@ -67,9 +74,17 @@ template <typename Dtype>
 class GPUDeviceTest : public MultiDeviceTest<GPUDevice<Dtype> > {
 };
 
+#ifdef NODOUBLEINSTANTIATION
+typedef ::testing::Types<CPUDevice<float>,
+                         GPUDevice<float> >
+                         TestDtypesAndDevices;
+typedef ::testing::Types<GPUDevice<float> > TestDtypesGPU;
+#else
 typedef ::testing::Types<CPUDevice<float>, CPUDevice<double>,
                          GPUDevice<float>, GPUDevice<double> >
                          TestDtypesAndDevices;
+typedef ::testing::Types<GPUDevice<float>, GPUDevice<double> > TestDtypesGPU;
+#endif
 
 #endif
 
