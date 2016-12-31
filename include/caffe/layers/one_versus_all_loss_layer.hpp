@@ -87,13 +87,15 @@ class OneVersusAllLossLayer : public LossLayer<Dtype> {
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   //virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
   //    const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
-  
+
   Dtype tsigsum_mul, tsigsum_add;
-  
+
   /// Whether to ignore instances with a certain label.
   bool has_ignore_label_;
   /// The label indicating that an instance should be ignored.
   int ignore_label_;
+  /// should we apply sigmoid to the input?
+  bool do_sigmoid_;
 
   /// The internal SigmoidLayer used to map predictions to probabilities.
   shared_ptr<SigmoidLayer<Dtype> > sigmoid_layer_;

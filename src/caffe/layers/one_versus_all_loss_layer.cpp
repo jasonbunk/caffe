@@ -9,15 +9,19 @@ template <typename Dtype>
 void OneVersusAllLossLayer<Dtype>::LayerSetUp(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   LossLayer<Dtype>::LayerSetUp(bottom, top);
-  sigmoid_bottom_vec_.clear();
-  sigmoid_bottom_vec_.push_back(bottom[0]);
-  sigmoid_top_vec_.clear();
-  sigmoid_top_vec_.push_back(sigmoid_output_.get());
-  sigmoid_layer_->SetUp(sigmoid_bottom_vec_, sigmoid_top_vec_);
-  
+
   has_ignore_label_ = this->layer_param_.loss_param().has_ignore_label();
   if (has_ignore_label_) {
     ignore_label_ = this->layer_param_.loss_param().ignore_label();
+  }
+  do_sigmoid_ = this->layer_param_.one_versus_all_param().do_sigmoid();
+
+  if(do_sigmoid_) {
+    sigmoid_bottom_vec_.clear();
+    sigmoid_bottom_vec_.push_back(bottom[0]);
+    sigmoid_top_vec_.clear();
+    sigmoid_top_vec_.push_back(sigmoid_output_.get());
+    sigmoid_layer_->SetUp(sigmoid_bottom_vec_, sigmoid_top_vec_);
   }
 }
 
@@ -27,7 +31,7 @@ void OneVersusAllLossLayer<Dtype>::Reshape(
   LossLayer<Dtype>::Reshape(bottom, top);
   CHECK_EQ(bottom[0]->count(), bottom[1]->count()) <<
       "ONE_VERSUS_ALL_LOSS layer inputs must have the same count.";
-  
+
   int numinbatch = bottom[0]->shape(0);
   int batchdim   = bottom[0]->count() / numinbatch;
   int spatialdim = bottom[0]->count() / (numinbatch * bottom[0]->shape(1));
@@ -35,17 +39,24 @@ void OneVersusAllLossLayer<Dtype>::Reshape(
   CHECK_EQ(numchannel, 1) <<
       "Must be binary classification with 1 output channel (per position)..."
       << " todo: multilabel";
-  
-  sigmoid_layer_->Reshape(sigmoid_bottom_vec_, sigmoid_top_vec_);
+
+  if(do_sigmoid_) {
+    sigmoid_layer_->Reshape(sigmoid_bottom_vec_, sigmoid_top_vec_);
+  }
 }
 
 template <typename Dtype>
 void OneVersusAllLossLayer<Dtype>::Forward_cpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
-  // The forward pass computes the sigmoid outputs.
-  sigmoid_bottom_vec_[0] = bottom[0];
-  sigmoid_layer_->Forward(sigmoid_bottom_vec_, sigmoid_top_vec_);
-  const Dtype* sigmoid_output_data = sigmoid_output_->cpu_data();
+
+  const Dtype* preds = NULL;
+  if(do_sigmoid_) {
+    sigmoid_bottom_vec_[0] = bottom[0];
+    sigmoid_layer_->Forward(sigmoid_bottom_vec_, sigmoid_top_vec_);
+    preds = sigmoid_output_->cpu_data();
+  } else {
+    preds = bottom[0]->cpu_data();
+  }
   Dtype loss = 0;
   tsigsum_mul = 0;
   tsigsum_add = 0;
@@ -66,11 +77,13 @@ void OneVersusAllLossLayer<Dtype>::Forward_cpu(
     if (has_ignore_label_ && target[i] == ignore_label_) {
       continue;
     }
+    CHECK(preds[i] >= 0.0 && preds[i] <= 1.0)
+          <<" pred["<<i<<"] == "<<preds[i]<<" which is < 0 or > 1 !!";
     CHECK(target[i] >= 0.0 && target[i] <= 1.0)
           <<" target was "<<target[i]<<", ignore_label_: "
           <<(has_ignore_label_ ? ignore_label_ : -999999);
-    tsigsum_mul += target[i] * sigmoid_output_data[i];
-    tsigsum_add += target[i] + sigmoid_output_data[i];
+    tsigsum_mul += target[i] * preds[i];
+    tsigsum_add += target[i] + preds[i];
   }
   if(tsigsum_mul > kLOG_THRESHOLD && tsigsum_add > kLOG_THRESHOLD) {
     loss = log(tsigsum_add) - 0.69314718055994530942 - log(tsigsum_mul);
@@ -92,27 +105,34 @@ void OneVersusAllLossLayer<Dtype>::Backward_cpu(
   if (propagate_down[0]) {
     // First, compute the diff
     const int count = bottom[0]->count();
-    const Dtype* sigmoid_output_data = sigmoid_output_->cpu_data();
     const Dtype* target = bottom[1]->cpu_data();
     Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
-    Dtype dsig = 0;
-    
+
 #if 0
     caffe_sub(count, sigmoid_output_data, target, bottom_diff);
 #else
-  if(tsigsum_mul > kLOG_THRESHOLD && tsigsum_add > kLOG_THRESHOLD) {
-    for (int i = 0; i < count; ++i) {
-      if (has_ignore_label_ == false || target[i] != ignore_label_) {
-        dsig = sigmoid_output_data[i] * (1 - sigmoid_output_data[i]);
-        bottom_diff[i] = -target[i] * dsig / tsigsum_mul + dsig / tsigsum_add;
+    caffe_set(count, static_cast<Dtype>(0), bottom_diff);
+
+    if(tsigsum_mul > kLOG_THRESHOLD && tsigsum_add > kLOG_THRESHOLD) {
+      const Dtype one_over_tsigsum_add = static_cast<Dtype>(1.0) / tsigsum_add;
+      const Dtype one_over_tsigsum_mul = static_cast<Dtype>(1.0) / tsigsum_mul;
+      if(do_sigmoid_) {
+        const Dtype* sigmoid_output_data = sigmoid_output_->cpu_data();
+        for (int i = 0; i < count; ++i) {
+          if (has_ignore_label_ == false || target[i] != ignore_label_) {
+            bottom_diff[i] = (one_over_tsigsum_add - target[i] * one_over_tsigsum_mul)
+                * sigmoid_output_data[i] * (static_cast<Dtype>(1.0) - sigmoid_output_data[i]);
+          }
+        }
+      } else {
+        for (int i = 0; i < count; ++i) {
+          if (has_ignore_label_ == false || target[i] != ignore_label_) {
+            bottom_diff[i] = one_over_tsigsum_add - target[i] * one_over_tsigsum_mul;
+          }
+        }
       }
     }
-  } else {
-    for (int i = 0; i < count; ++i)
-      bottom_diff[i] = 0.0;
-  }
 #endif
-
 
     // Scale down gradient
     const Dtype loss_weight = top[0]->cpu_diff()[0];

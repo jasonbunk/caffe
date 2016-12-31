@@ -63,12 +63,27 @@ class OneVersusAllLossLayerTest : public MultiDeviceTest<TypeParam> {
 
 TYPED_TEST_CASE(OneVersusAllLossLayerTest, TestDtypesAndDevices);
 
-TYPED_TEST(OneVersusAllLossLayerTest, TestGradient) {
+TYPED_TEST(OneVersusAllLossLayerTest, TestGradientSigmoid) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
   const Dtype kLossWeight = 3.7;
   layer_param.add_loss_weight(kLossWeight);
   layer_param.mutable_loss_param()->set_ignore_label(253);
+  layer_param.mutable_one_versus_all_param()->set_do_sigmoid(true);
+  OneVersusAllLossLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  GradientChecker<Dtype> checker(1e-2, 1e-2, 1701);
+  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
+      this->blob_top_vec_, 0);
+}
+
+TYPED_TEST(OneVersusAllLossLayerTest, TestGradientNoSigmoid) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  const Dtype kLossWeight = 3.7;
+  layer_param.add_loss_weight(kLossWeight);
+  layer_param.mutable_loss_param()->set_ignore_label(253);
+  layer_param.mutable_one_versus_all_param()->set_do_sigmoid(false);
   OneVersusAllLossLayer<Dtype> layer(layer_param);
   layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
   GradientChecker<Dtype> checker(1e-2, 1e-2, 1701);
