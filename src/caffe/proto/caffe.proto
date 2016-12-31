@@ -306,7 +306,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 151 (last added: rbf_param)
+// LayerParameter next available layer-specific ID: 152 (last added: one_versus_all_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -386,6 +386,7 @@ message LayerParameter {
   optional MemoryDataParameter memory_data_param = 119;
   optional MultiStageMeanfieldParameter multi_stage_meanfield_param = 147;
   optional MVNParameter mvn_param = 120;
+  optional OneVersusAllLossLayerParameter one_versus_all_param = 151;
   optional ParameterParameter parameter_param = 145;
   optional PoolingParameter pooling_param = 121;
   optional PowerParameter power_param = 122;
@@ -937,6 +938,10 @@ message ParameterParameter {
   optional BlobShape shape = 1;
 }
 
+message OneVersusAllLossLayerParameter {
+  optional bool do_sigmoid = 1 [default = true];
+}
+
 message PoolingParameter {
   enum PoolMethod {
     MAX = 0;
@@ -994,7 +999,7 @@ message RBFParameter {
   optional uint32 centroids_per_output = 2 [default = 0];
   // share one set of centroids for all outputs?
   optional bool share_centroids = 3 [default = true];
-  
+
   optional FillerParameter scalar_filler = 4; // The filler for the scalars
   optional FillerParameter width_filler = 5; // The filler for the widths
   optional FillerParameter centroid_filler = 6; // The filler for the centroids

@@ -24,8 +24,9 @@ class OneVersusAllLossLayerTest : public MultiDeviceTest<TypeParam> {
         blob_top_loss_(new Blob<Dtype>()) {
     // Fill the data vector
     FillerParameter data_filler_param;
-    data_filler_param.set_std(1);
-    GaussianFiller<Dtype> data_filler(data_filler_param);
+    data_filler_param.set_min(0.011); // gradient checker adds +/- 0.01
+    data_filler_param.set_max(0.989);
+    UniformFiller<Dtype> data_filler(data_filler_param);
     data_filler.Fill(blob_bottom_data_);
     blob_bottom_vec_.push_back(blob_bottom_data_);
     // Fill the targets vector
