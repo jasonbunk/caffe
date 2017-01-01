@@ -1,0 +1,45 @@
+name: "BilateralTest"
+
+# LMDB file built with command:
+# ./build/tools/convert_imageset --encoded=1 --encode_type=png examples/images/ examples/images/cat.txt examples/images/CatLMDB
+
+layer {
+  name: "data_rgb"
+  type: "Data"
+  top: "data_rgb"
+  data_param {
+    source: "examples/images/CatLMDB"
+    backend: LMDB
+    batch_size: 1
+  }
+  #transform_param {
+  #  crop_size: 256
+  #  affine_goal_size_x: 260
+  #  affine_goal_size_y: 260
+  #  affine_noise_angle: 15
+  #  affine_noise_scale: 0.10
+  #  affine_noise_shear: 0.10
+  #  affine_noise_translate: 7.0
+  #}
+}
+
+layer {
+  name: "bilateralfilter"
+  type: "BilateralFilter"
+  bottom: "data_rgb"
+  bottom: "data_rgb"
+ # top: "filt_space"
+  top: "filt_bilat"
+  bilateral_filter_param {
+    stdv_space: 5
+    stdv_color: 45
+  }
+}
+
+layer {
+  name: "testvisualize"
+  type: "TestOpenCVPreview"
+  bottom: "filt_bilat"
+  top: "testcopy"
+}
+

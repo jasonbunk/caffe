@@ -1,0 +1,51 @@
+name: "BilateralTest"
+
+# LMDB file built with command:
+# ./build/tools/convert_imageset --encoded=1 --encode_type=png examples/images/ examples/images/cat.txt examples/images/CatLMDB
+
+layer {
+  name: "data_rgb"
+  type: "Data"
+  top: "data_rgb"
+  data_param {
+    source: "examples/images/CatLMDB"
+    backend: LMDB
+    batch_size: 1
+  }
+  #transform_param {
+  #  crop_size: 256
+  #  affine_goal_size_x: 260
+  #  affine_goal_size_y: 260
+  #  affine_noise_angle: 15
+  #  affine_noise_scale: 0.10
+  #  affine_noise_shear: 0.10
+  #  affine_noise_translate: 7.0
+  #}
+}
+
+layer {
+  name: "msmeanfield"
+  type: "MultiStageMeanfield"
+  bottom: "data_rgb"
+  bottom: "data_rgb"
+  bottom: "data_rgb"
+  top: "pred"
+  multi_stage_meanfield_param {
+   num_iterations: 2
+   compatibility_mode: POTTS # Initialize compatilibity transform matrix with a matrix whose diagonal is -1.
+   theta_alpha: 5 # stdv bilat space
+   theta_beta: 45 # stdv bilat color
+   theta_gamma: 5 # stdv space space
+   spatial_filter_weight: 0
+   bilateral_filter_weight: 1
+   do_softmax: 0
+  }
+}
+
+layer {
+  name: "testvisualize"
+  type: "TestOpenCVPreview"
+  bottom: "pred"
+  top: "testcopy"
+}
+

@@ -306,7 +306,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 153 (last added: precision_recall_param)
+// LayerParameter next available layer-specific ID: 154 (last added: bilateral_filter_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -362,6 +362,7 @@ message LayerParameter {
   optional ArgMaxParameter argmax_param = 103;
   optional BatchNormParameter batch_norm_param = 139;
   optional BiasParameter bias_param = 141;
+  optional BilateralFilterParameter bilateral_filter_param = 153;
   optional ConcatParameter concat_param = 104;
   optional ContrastiveLossParameter contrastive_loss_param = 105;
   optional ConvolutionParameter convolution_param = 106;
@@ -509,6 +510,8 @@ message MultiStageMeanfieldParameter {
 
   optional float forced_spatial_filter_weight = 9;
   optional float forced_bilateral_filter_weight = 10;
+
+  optional bool do_softmax = 11 [default = true];
 }
 
 // Messages that store parameters used by individual layer types follow, in
@@ -595,6 +598,13 @@ message BiasParameter {
   // Default is the zero (0) initialization, resulting in the BiasLayer
   // initially performing the identity operation.
   optional FillerParameter filler = 3;
+}
+
+// Message that stores parameters used by BilateralFilterLayer
+message BilateralFilterParameter {
+  optional float stdv_space = 1 [default = 1];
+  optional float stdv_color = 2 [default = 1];
+  optional bool create_spatial_dimension_features = 3 [default = true];
 }
 
 message ContrastiveLossParameter {
