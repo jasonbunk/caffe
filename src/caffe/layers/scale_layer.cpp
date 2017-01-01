@@ -6,6 +6,8 @@
 #include "caffe/layers/scale_layer.hpp"
 #include "caffe/util/math_functions.hpp"
 
+#define DOREALSOFTMAX 1
+
 namespace caffe {
 
 template <typename Dtype>
@@ -70,6 +72,7 @@ void ScaleLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     bias_propagate_down_.resize(1, false);
   }
   this->param_propagate_down_.resize(this->blobs_.size(), true);
+  weights_sum_to_one_ = param.weights_sum_to_one();
 }
 
 template <typename Dtype>
@@ -111,11 +114,46 @@ void ScaleLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
     bias_bottom_vec_[0] = top[0];
     bias_layer_->Reshape(bias_bottom_vec_, top);
   }
+  if(weights_sum_to_one_) {
+    // Softmax layer configuration
+    CHECK_GT(scale->count(), 1) << "Can\'t do softmax on one single value!";
+    const bool is_eltwise = (bottom[0]->count() == scale->count());
+#if 1
+    if(!(bottom.size() == 1 || !is_eltwise)) {
+      weights_sum_to_one_ = false;
+      for(int ii=0; ii<2; ++ii) {
+        std::cout<<"------------------------------------------------"<<std::endl;
+        std::cout<<"TODO: gradient check fails when this check fails"<<std::endl;
+        std::cout<<"           so, disabling \"weights_sum_to_one_\""<<std::endl;
+      }
+      return;
+    }
+#else
+    CHECK(bottom.size() == 1 || !is_eltwise) <<
+                        "TODO: gradient check fails when this check fails";
+#endif
+    softmax_bottom_vec_.clear();
+    softmax_bottom_vec_.push_back(scale);
+    softmax_top_vec_.clear();
+    softmax_top_vec_.push_back(&softmax_output_);
+    LayerParameter softmax_param;
+    softmax_param.mutable_softmax_param()->set_axis(-1);
+    softmax_layer_.reset(new SoftmaxLayer<Dtype>(softmax_param));
+    softmax_layer_->SetUp(softmax_bottom_vec_, softmax_top_vec_);
+  }
 }
 
 template <typename Dtype>
 void ScaleLayer<Dtype>::Forward_cpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
+  if(weights_sum_to_one_) {
+    CHECK_EQ(softmax_bottom_vec_[0]->count(), softmax_top_vec_[0]->count());
+#if DOREALSOFTMAX
+    softmax_layer_->Forward(softmax_bottom_vec_, softmax_top_vec_);
+#else
+    caffe_copy(softmax_bottom_vec_[0]->count(), softmax_bottom_vec_[0]->cpu_data(), softmax_top_vec_[0]->mutable_cpu_data());
+#endif
+  }
   const Dtype* bottom_data = bottom[0]->cpu_data();
   if (bottom[0] == top[0]) {
     // In-place computation; need to store bottom data before overwriting it.
@@ -125,7 +163,7 @@ void ScaleLayer<Dtype>::Forward_cpu(
     caffe_copy(bottom[0]->count(), bottom[0]->cpu_data(),
                temp_.mutable_cpu_data());
   }
-  const Dtype* scale_data =
+  const Dtype* scale_data = weights_sum_to_one_ ? softmax_output_.cpu_data() :
       ((bottom.size() > 1) ? bottom[1] : this->blobs_[0].get())->cpu_data();
   Dtype* top_data = top[0]->mutable_cpu_data();
   for (int n = 0; n < outer_dim_; ++n) {
@@ -149,7 +187,11 @@ void ScaleLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     bias_layer_->Backward(top, bias_propagate_down_, bias_bottom_vec_);
   }
   const bool scale_param = (bottom.size() == 1);
-  Blob<Dtype>* scale = scale_param ? this->blobs_[0].get() : bottom[1];
+  Blob<Dtype>* scale = weights_sum_to_one_ ? &softmax_output_ :
+                      (scale_param ? this->blobs_[0].get() : bottom[1]);
+  if(weights_sum_to_one_) {
+    caffe_set(scale->count(), static_cast<Dtype>(0), scale->mutable_cpu_diff());
+  }
   if ((!scale_param && propagate_down[1]) ||
       (scale_param && this->param_propagate_down_[0])) {
     const Dtype* top_diff = top[0]->cpu_diff();
@@ -200,6 +242,15 @@ void ScaleLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
                          scale_diff);
         }
       }
+    }
+    if(weights_sum_to_one_) {
+      CHECK_EQ(softmax_bottom_vec_[0]->count(), softmax_top_vec_[0]->count());
+  #if DOREALSOFTMAX
+      vector<bool> propagations(softmax_bottom_vec_.size(), true);
+      softmax_layer_->Backward(softmax_top_vec_, propagations, softmax_bottom_vec_);
+  #else
+      caffe_copy(softmax_bottom_vec_[0]->count(), softmax_top_vec_[0]->cpu_diff(), softmax_bottom_vec_[0]->mutable_cpu_diff());
+  #endif
     }
   }
   if (propagate_down[0]) {

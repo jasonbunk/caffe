@@ -8,6 +8,7 @@
 #include "caffe/proto/caffe.pb.h"
 
 #include "caffe/layers/bias_layer.hpp"
+#include "caffe/layers/softmax_layer.hpp"
 
 namespace caffe {
 
@@ -71,6 +72,12 @@ class ScaleLayer: public Layer<Dtype> {
   vector<Blob<Dtype>*> bias_bottom_vec_;
   vector<bool> bias_propagate_down_;
   int bias_param_id_;
+
+  bool weights_sum_to_one_;
+  Blob<Dtype> softmax_output_;
+  shared_ptr<SoftmaxLayer<Dtype> > softmax_layer_;
+  vector<Blob<Dtype>*> softmax_top_vec_;
+  vector<Blob<Dtype>*> softmax_bottom_vec_;
 
   Blob<Dtype> sum_multiplier_;
   Blob<Dtype> sum_result_;

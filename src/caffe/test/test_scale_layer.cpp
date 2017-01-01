@@ -470,6 +470,85 @@ TYPED_TEST(ScaleLayerTest, TestGradientBroadcastEnd) {
       this->blob_top_vec_);
 }
 
+//------------------------------------------------------------------------
+TYPED_TEST(ScaleLayerTest, TestGradientEltwise_WeightsSumToOne) {
+  typedef typename TypeParam::Dtype Dtype;
+  this->blob_bottom_vec_.push_back(this->blob_bottom_eltwise_);
+  LayerParameter layer_param;
+  layer_param.mutable_scale_param()->set_axis(0);
+  layer_param.mutable_scale_param()->set_weights_sum_to_one(true);
+  ScaleLayer<Dtype> layer(layer_param);
+  GradientChecker<Dtype> checker(1e-2, 1e-3);
+  checker.CheckGradientEltwise(&layer, this->blob_bottom_vec_,
+      this->blob_top_vec_);
+}
+
+TYPED_TEST(ScaleLayerTest, TestGradientEltwiseWithParam_WeightsSumToOne) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  ScaleParameter* scale_param = layer_param.mutable_scale_param();
+  scale_param->set_axis(0);
+  scale_param->set_num_axes(-1);
+  scale_param->mutable_filler()->set_type("gaussian");
+  scale_param->set_weights_sum_to_one(true);
+  ScaleLayer<Dtype> layer(layer_param);
+  GradientChecker<Dtype> checker(1e-2, 1e-3);
+  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
+      this->blob_top_vec_);
+}
+
+TYPED_TEST(ScaleLayerTest, TestGradientBroadcastBegin_WeightsSumToOne) {
+  typedef typename TypeParam::Dtype Dtype;
+  this->blob_bottom_vec_.push_back(this->blob_bottom_broadcast_0_);
+  LayerParameter layer_param;
+  layer_param.mutable_scale_param()->set_axis(0);
+  layer_param.mutable_scale_param()->set_weights_sum_to_one(true);
+  ScaleLayer<Dtype> layer(layer_param);
+  GradientChecker<Dtype> checker(1e-2, 1e-3);
+  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
+      this->blob_top_vec_);
+}
+
+TYPED_TEST(ScaleLayerTest, TestGradientBroadcastMiddle_WeightsSumToOne) {
+  typedef typename TypeParam::Dtype Dtype;
+  this->blob_bottom_vec_.push_back(this->blob_bottom_broadcast_1_);
+  LayerParameter layer_param;
+  layer_param.mutable_scale_param()->set_axis(1);
+  layer_param.mutable_scale_param()->set_weights_sum_to_one(true);
+  ScaleLayer<Dtype> layer(layer_param);
+  GradientChecker<Dtype> checker(1e-2, 1e-3);
+  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
+      this->blob_top_vec_);
+}
+
+TYPED_TEST(ScaleLayerTest, TestGradientBroadcastMiddleWithParam_WeightsSumToOne) {
+  typedef typename TypeParam::Dtype Dtype;
+  this->blob_bottom_vec_.push_back(this->blob_bottom_broadcast_1_);
+  LayerParameter layer_param;
+  ScaleParameter* scale_param = layer_param.mutable_scale_param();
+  scale_param->set_axis(1);
+  scale_param->set_num_axes(2);
+  scale_param->mutable_filler()->set_type("gaussian");
+  scale_param->set_weights_sum_to_one(true);
+  ScaleLayer<Dtype> layer(layer_param);
+  GradientChecker<Dtype> checker(1e-2, 1e-3);
+  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
+      this->blob_top_vec_);
+}
+
+TYPED_TEST(ScaleLayerTest, TestGradientBroadcastEnd_WeightsSumToOne) {
+  typedef typename TypeParam::Dtype Dtype;
+  this->blob_bottom_vec_.push_back(this->blob_bottom_broadcast_2_);
+  LayerParameter layer_param;
+  layer_param.mutable_scale_param()->set_axis(2);
+  layer_param.mutable_scale_param()->set_weights_sum_to_one(true);
+  ScaleLayer<Dtype> layer(layer_param);
+  GradientChecker<Dtype> checker(1e-2, 1e-3);
+  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
+      this->blob_top_vec_);
+}
+//------------------------------------------------------------------------
+
 TYPED_TEST(ScaleLayerTest, TestGradientScale) {
   typedef typename TypeParam::Dtype Dtype;
   this->blob_bottom_vec_.push_back(this->blob_bottom_scale_);

@@ -29,6 +29,9 @@ __global__ void ScaleBiasForward(const int n, const Dtype* in,
 template <typename Dtype>
 void ScaleLayer<Dtype>::Forward_gpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
+  if(weights_sum_to_one_) {
+    softmax_layer_->Forward(softmax_bottom_vec_, softmax_top_vec_);
+  }
   const int count = top[0]->count();
   const Dtype* bottom_data = bottom[0]->gpu_data();
   if (bottom[0] == top[0]) {
@@ -39,7 +42,7 @@ void ScaleLayer<Dtype>::Forward_gpu(
     caffe_copy(bottom[0]->count(), bottom[0]->gpu_data(),
                temp_.mutable_gpu_data());
   }
-  const Dtype* scale_data =
+  const Dtype* scale_data = weights_sum_to_one_ ? softmax_output_.gpu_data() :
       ((bottom.size() > 1) ? bottom[1] : this->blobs_[0].get())->gpu_data();
   Dtype* top_data = top[0]->mutable_gpu_data();
   if (bias_layer_) {
@@ -63,7 +66,8 @@ void ScaleLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     bias_layer_->Backward(top, bias_propagate_down_, bias_bottom_vec_);
   }
   const bool scale_param = (bottom.size() == 1);
-  Blob<Dtype>* scale = scale_param ? this->blobs_[0].get() : bottom[1];
+  Blob<Dtype>* scale = weights_sum_to_one_ ? &softmax_output_ :
+                      (scale_param ? this->blobs_[0].get() : bottom[1]);
   if ((!scale_param && propagate_down[1]) ||
       (scale_param && this->param_propagate_down_[0])) {
     const Dtype* top_diff = top[0]->gpu_diff();
@@ -117,6 +121,10 @@ void ScaleLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
                          scale_diff);
         }
       }
+    }
+    if(weights_sum_to_one_) {
+      vector<bool> propagations(softmax_bottom_vec_.size(), true);
+      softmax_layer_->Backward(softmax_top_vec_, propagations, softmax_bottom_vec_);
     }
   }
   if (propagate_down[0]) {

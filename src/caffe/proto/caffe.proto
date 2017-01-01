@@ -1188,6 +1188,9 @@ message ScaleParameter {
   // may be more efficient).  Initialized with bias_filler (defaults to 0).
   optional bool bias_term = 4 [default = false];
   optional FillerParameter bias_filler = 5;
+
+  // should the scaling weights sum to one?
+  optional bool weights_sum_to_one = 6 [default = false];
 }
 
 message SigmoidParameter {
