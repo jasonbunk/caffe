@@ -62,7 +62,7 @@ void OneVersusAllLossLayer<Dtype>::Forward_cpu(
   tsigsum_add = 0;
   const Dtype* target = bottom[1]->cpu_data();
   const int count = bottom[0]->count();
-
+  Dtype pred;
 
 #if 0
   const Dtype* input_data = bottom[0]->cpu_data();
@@ -77,13 +77,14 @@ void OneVersusAllLossLayer<Dtype>::Forward_cpu(
     if (has_ignore_label_ && target[i] == ignore_label_) {
       continue;
     }
-    CHECK(preds[i] >= 0.0 && preds[i] <= 1.0)
-          <<" pred["<<i<<"] == "<<preds[i]<<" which is < 0 or > 1 !!";
+    CHECK(preds[i] > static_cast<Dtype>(-0.000001) && preds[i] < static_cast<Dtype>(1.000001))
+          <<" pred["<<i<<"] == "<<preds[i]<<" which is < 0 or > 1 !!  note: preds[i]-1.0 = "<<(preds[i]-1.0);
     CHECK(target[i] >= 0.0 && target[i] <= 1.0)
           <<" target was "<<target[i]<<", ignore_label_: "
           <<(has_ignore_label_ ? ignore_label_ : -999999);
-    tsigsum_mul += target[i] * preds[i];
-    tsigsum_add += target[i] + preds[i];
+    pred = std::min(static_cast<Dtype>(1.0), std::max(static_cast<Dtype>(0.0), preds[i]));
+    tsigsum_mul += target[i] * pred;
+    tsigsum_add += target[i] + pred;
   }
   if(tsigsum_mul > kLOG_THRESHOLD && tsigsum_add > kLOG_THRESHOLD) {
     loss = log(tsigsum_add) - 0.69314718055994530942 - log(tsigsum_mul);
