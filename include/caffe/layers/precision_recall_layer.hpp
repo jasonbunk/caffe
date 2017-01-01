@@ -44,6 +44,12 @@ class PrecisionRecallLayer : public Layer<Dtype> {
 
   int label_axis_, outer_num_, inner_num_;
 
+  /** What is the threshold for binary classification?
+   *  If the inputs have gone through sigmoid, it may be 0.5,
+   *  if they have not yet gone through sigmoid (but will be), it may be 0.0
+   *  Defaults to 0, controlled by "pred_thresh" param.
+   */
+  Dtype pred_thresh_;
   /// Whether to ignore instances with a certain label.
   bool has_ignore_label_;
   /// The label indicating that an instance should be ignored.

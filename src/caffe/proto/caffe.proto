@@ -306,7 +306,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 152 (last added: one_versus_all_param)
+// LayerParameter next available layer-specific ID: 153 (last added: precision_recall_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -390,6 +390,7 @@ message LayerParameter {
   optional ParameterParameter parameter_param = 145;
   optional PoolingParameter pooling_param = 121;
   optional PowerParameter power_param = 122;
+  optional PrecisionRecallLayerParameter precision_recall_param = 152;
   optional PReLUParameter prelu_param = 131;
   optional PythonParameter python_param = 130;
   optional RBFParameter rbf_param = 150;
@@ -976,6 +977,14 @@ message PowerParameter {
   optional float power = 1 [default = 1.0];
   optional float scale = 2 [default = 1.0];
   optional float shift = 3 [default = 0.0];
+}
+
+message PrecisionRecallLayerParameter {
+  // What is the threshold for binary classification?
+  // If the inputs have gone through sigmoid, it may be 0.5,
+  // if they have not yet gone through sigmoid (but will be), it may be 0.0
+  // Defaults to 0 (assuming no sigmoid has yet been applied, but will want it)
+  optional float pred_threshold = 1 [default = 0.0];
 }
 
 message PythonParameter {

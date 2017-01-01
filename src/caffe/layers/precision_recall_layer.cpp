@@ -15,6 +15,7 @@ void PrecisionRecallLayer<Dtype>::LayerSetUp(
   if (has_ignore_label_) {
     ignore_label_ = this->layer_param_.accuracy_param().ignore_label();
   }
+  pred_thresh_ = this->layer_param_.precision_recall_param().pred_threshold();
 }
 
 template <typename Dtype>
@@ -46,7 +47,6 @@ void PrecisionRecallLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
   Dtype count1 = ((Dtype)0);
   Dtype correct0 = ((Dtype)0);
   Dtype correct1 = ((Dtype)0);
-  //LOG(INFO)<<"outer_num_ == "<<outer_num_<<", inner_num_ == "<<inner_num_<<", label_axis_ == "<<label_axis_<<", bottom[0]->count() == "<<bottom[0]->count();
   for (int i = 0; i < outer_num_; ++i) {
     for (int j = 0; j < inner_num_; ++j) {
       const int label_value = static_cast<int>(bottom_label[i * inner_num_ + j]);
@@ -54,13 +54,14 @@ void PrecisionRecallLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
         continue;
       }
       if(label_value == 0) {count0 += 1.0;} else {count1 += 1.0;}
-      DCHECK_GE(label_value, 0);
-      DCHECK_LT(label_value, num_labels);
+      CHECK_GE(label_value, 0);
+      CHECK_LE(label_value,num_labels) << "(has_ignore_label_ = "
+                  <<has_ignore_label_<<", ignore_label_ = "<<ignore_label_<<")";
       if(num_labels == 1) {
         // check if true label is top prediction
-        if (bottom_data[i * dim + j] < 0.5 && label_value == 0) {
+        if (bottom_data[i * dim + j] < pred_thresh_ && label_value == 0) {
           correct0++;
-        } else if (bottom_data[i * dim + j] >= 0.5 && label_value == 1) {
+        } else if (bottom_data[i * dim + j] >= pred_thresh_ && label_value == 1) {
           correct1++;
         }
       } else {
@@ -80,18 +81,14 @@ void PrecisionRecallLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
       }
     }
   }
-  /*top[0]->mutable_cpu_data()[0] = count0;
-  top[0]->mutable_cpu_data()[1] = count1;
-  top[0]->mutable_cpu_data()[2] = correct0;
-  top[0]->mutable_cpu_data()[3] = correct1;*/
-  
+
   Dtype falsepositives = count0 - correct0;
-  
+
   Dtype precis = (correct1 + falsepositives) <= 0.0 ? 0.0 : (correct1 / (correct1 + falsepositives));
   Dtype recall = count1 <= 0.0 ? 0.0 : correct1 / count1;
-  
+
   //Dtype specifcity = (falsepositives + correct0) <= 0.0 ? 0.0 : correct0 / (falsepositives + correct0);
-  
+
   Dtype hmdenom = precis + recall;
   //Dtype hmdenom = specifcity + recall;
 
@@ -100,23 +97,12 @@ void PrecisionRecallLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
   //top[0]->mutable_cpu_data()[2] = specifcity;
   top[0]->mutable_cpu_data()[2] = hmdenom <= kLOG_THRESHOLD ? 0.0 : (2.0 * precis * recall / hmdenom);
   //top[0]->mutable_cpu_data()[3] = hmdenom <= 0.0 ? 0.0 : (2.0 * specifcity * recall / hmdenom);
-  
-  //accuracy
+
+  //output #3 is accuracy
   top[0]->mutable_cpu_data()[3] = (correct0 + correct1) / (count0 + count1);
-  //top[0]->mutable_cpu_data()[3] = top[0]->mutable_cpu_data()[2] > kLOG_THRESHOLD ?
-  //              -log(top[0]->mutable_cpu_data()[2]) : 0;
 }
 
 INSTANTIATE_CLASS(PrecisionRecallLayer);
 REGISTER_LAYER_CLASS(PrecisionRecall);
 
 }  // namespace caffe
-
-
-
-
-
-
-
-
-
