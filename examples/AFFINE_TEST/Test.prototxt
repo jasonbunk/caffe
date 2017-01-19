@@ -10,7 +10,8 @@ layer {
   data_param {
     source: "examples/images/CatLMDB"
     backend: LMDB
-    batch_size: 1
+    batch_size: 6
+    duplication_amount: 2
   }
   transform_param {
     crop_size: 256

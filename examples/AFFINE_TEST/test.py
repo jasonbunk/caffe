@@ -10,7 +10,7 @@ import cv2
 if not os.path.isdir(caffe_root+'examples/images/CatLMDB'):
 	import subprocess
 	with open(caffe_root+'examples/images/cat.txt','w') as listfile:
-		listfile.write('cat.jpg 0')
+		listfile.write('cat.jpg 0\r\nfish-bike.jpg 0')
 	subprocess.check_output([caffe_root+'build/tools/convert_imageset',
 			'--encoded=1',
 			'--encode_type=png',
@@ -22,7 +22,7 @@ caffe.set_mode_cpu()
 nnet = caffe.Net(caffe_root+'examples/AFFINE_TEST/Test.prototxt', caffe.TEST)
 
 def displayable(caffeimage):
-	return np.transpose(caffeimage[0,:,:,:],(1,2,0)) / 255.0
+	return np.transpose(caffeimage,(1,2,0)) / 255.0
 
 for ii in range(10000):
 
@@ -34,5 +34,6 @@ for ii in range(10000):
 
 	print("nnet.blobs[conv1].data.shape == "+str(nnet.blobs['conv1'].data.shape)+" ... forward time: "+str(afttime - beftime)+" seconds")
 
-	cv2.imshow('caffe-im', displayable(caffeim))
+	for jj in range(caffeim.shape[0]):
+		cv2.imshow('caffe-im-'+str(jj), displayable(caffeim[jj,...]))
 	cv2.waitKey(0)

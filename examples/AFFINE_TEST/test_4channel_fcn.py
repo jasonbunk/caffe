@@ -10,7 +10,7 @@ import cv2
 if not os.path.isdir(caffe_root+'examples/images/CatWithMaskLMDB'):
 	import subprocess
 	with open(caffe_root+'examples/images/cat_with_mask.txt','w') as listfile:
-		listfile.write('cat_with_mask.png 0')
+		listfile.write('cat_with_mask.png 0\r\nfish_bike_with_mask.png 0')
 	subprocess.check_output([caffe_root+'build/tools/convert_imageset',
 			'--encoded=1',
 			'--encode_type=png',
