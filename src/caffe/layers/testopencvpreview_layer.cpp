@@ -2,8 +2,10 @@
 
 #include "caffe/layers/testopencvpreview_layer.hpp"
 #include "caffe/util/math_functions.hpp"
+#if USE_OPENCV
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#endif
 #define MINOF2(x,y) ((x)<(y)?(x):(y))
 #define MAXOF2(x,y) ((x)>(y)?(x):(y))
 
@@ -37,6 +39,7 @@ void TestOpenCVPreviewLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top
 
 template <typename Dtype>
 void visualize_buf(Blob<Dtype> const* buf) {
+#if USE_OPENCV
     const Dtype* buf_data = buf->cpu_data();
     CHECK_EQ(buf->num_axes(), 4);
     const int nbatch = buf->shape(0);
@@ -66,6 +69,9 @@ void visualize_buf(Blob<Dtype> const* buf) {
       cv::imshow("caffe-img", (mergedmat-globalmin)/(globalmax-globalmin));
       cv::waitKey(0);
     }
+#else
+    std::cout<<"visualize_buf(): can't visualize image, please recompile with USE_OPENCV == 1"<<std::endl;
+#endif
 }
 
 // instantiate
