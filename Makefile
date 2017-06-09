@@ -211,7 +211,6 @@ ifeq ($(HDF5SERIAL), 1)
 else
 	LIBRARIES += hdf5_hl hdf5
 endif
-PYTHON_LIBRARIES ?= boost_python python2.7
 WARNINGS := -Wall -Wno-sign-compare
 
 ##############################
@@ -659,6 +658,19 @@ $(PY_PROTO_INIT): | $(PY_PROTO_BUILD_DIR)
 	touch $(PY_PROTO_INIT)
 
 clean:
+	@ echo " "
+	@ echo "INCLUDE_DIRS"
+	@ echo $(INCLUDE_DIRS)
+	@ echo " "
+	@ echo "PYTHON_INCLUDE"
+	@ echo $(PYTHON_INCLUDE)
+	@ echo " "
+	@ echo "PYTHON_LIBRARIES"
+	@ echo $(PYTHON_LIBRARIES)
+	@ echo " "
+	@ echo "PYTHON_LIB"
+	@ echo $(PYTHON_LIB)
+	@ echo " "
 	@- $(RM) -rf $(ALL_BUILD_DIRS)
 	@- $(RM) -rf $(OTHER_BUILD_DIR)
 	@- $(RM) -rf $(BUILD_DIR_LINK)
